@@ -12,7 +12,7 @@ OBJ_DIR		= obj
 OBJS		= $(OBJ_DIR)/woody_packer.o
 
 CC			= cc
-CFLAGS		= #-Wall -Wextra -Werror
+CFLAGS		= -g3 #-Wall -Wextra -Werror
 CHFLAGS		= -I include
 
 RM			= rm -f
@@ -20,7 +20,7 @@ DIR_DUP		= mkdir -p $(@D)
 
 all: $(NAME)
 
-$(NAME): $(OBJS)
+$(NAME): $(OBJS) woody_packer.h
 	@$(CC) $(OBJS) -o $(NAME)
 	@printf "$(COLOR_RED)$(COLOR_BOLD)Compilation réussie !$(COLOR_RESET)\n"
 

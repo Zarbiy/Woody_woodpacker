@@ -1,9 +1,64 @@
-#include <unistd.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <elf.h>
+#include "woody_packer.h"
+
+uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t add_value) {
+    uint64_t result = 0;
+    for (int i = 0; i <= end - start; i++) {
+        result |= ((uint64_t)file[add_value + start + i]) << (8 * i);
+    }
+    return result;
+}
+
+int init_struct_elf_program(t_index_struct_elf *elf, t_index_program_header *program) {
+    if (elf->architecture == 1) {
+        // init index header elf
+        elf->program_entry_offset[0] = 24;
+        elf->program_entry_offset[1] = 27;
+        elf->offset_section_header[0] = 32;
+        elf->offset_section_header[1] = 35;
+        elf->size_section[0] = 46;
+        elf->size_section[1] = 47;
+        elf->number_section[0] = 48;
+        elf->number_section[1] = 49;
+        elf->num_section_name_section[0] = 50;
+        elf->num_section_name_section[1] = 51;
+
+        // init index header section
+        program->sh_name[0] = 0;
+        program->sh_name[1] = 3;
+        program->addr[0] = 12;
+        program->addr[1] = 15;
+        program->offset[0] = 16;
+        program->offset[1] = 19;
+        program->size[0] = 20;
+        program->size[1] = 23;
+    }
+    else if (elf->architecture == 2) {
+        // init index header elf
+        elf->program_entry_offset[0] = 24;
+        elf->program_entry_offset[1] = 31;
+        elf->offset_section_header[0] = 40;
+        elf->offset_section_header[1] = 47;
+        elf->size_section[0] = 58;
+        elf->size_section[1] = 59;
+        elf->number_section[0] = 60;
+        elf->number_section[1] = 61;
+        elf->num_section_name_section[0] = 62;
+        elf->num_section_name_section[1] = 63;
+
+        // init index header section
+        program->sh_name[0] = 0;
+        program->sh_name[1] = 3;
+        program->addr[0] = 16;
+        program->addr[1] = 23;
+        program->offset[0] = 24;
+        program->offset[1] = 31;
+        program->size[0] = 32;
+        program->size[1] = 39;
+    }
+    else
+        return -1;
+    return 0;
+}
 
 int main(int ac, char **av){
     if (ac != 2) {
@@ -30,65 +85,110 @@ int main(int ac, char **av){
         return 0;
     }
 
-    // // V1 avec header elf.h
+    // V1 avec header elf.h
     printf("Avec header elf\n\n");
-    Elf64_Ehdr *header_elf = (Elf64_Ehdr *)file;                            // contient le header de elf
-    Elf64_Shdr *section_table = (Elf64_Shdr *)(file + header_elf->e_shoff); // avance dans le header de e_shoff pour aller au debut de section table
-    Elf64_Shdr *section_name = &section_table[header_elf->e_shstrndx];      // renvoie vers le position qui contient les noms des sections  
+    Elf32_Ehdr *header32 = NULL;
+    Elf64_Ehdr *header64 = NULL;
+    void *section_table = NULL;
+    void *section_name = NULL;
+    char *start_name_section = NULL;
+    int shnum = 0;
 
-    char *start_name_section = (char *)(file + section_name->sh_offset);
-    
-    printf("%lx %lu\n", header_elf->e_shoff, header_elf->e_shoff);
-    printf("%lx %lu\n", section_name->sh_offset, section_name->sh_offset);
-    printf("Type : %i\n", header_elf->e_type);
-    printf("Nb sections : %d\n\n", header_elf->e_shnum);
+    if (file[4] == 1) {
+        header32 = (Elf32_Ehdr *)file;
+        section_table = (Elf32_Shdr *)(file + header32->e_shoff);
+        section_name = &((Elf32_Shdr *)section_table)[header32->e_shstrndx];
+        start_name_section = (char *)(file + ((Elf32_Shdr *)section_name)->sh_offset);
+        shnum = header32->e_shnum;
 
-    for (int i = 0; i < header_elf->e_shnum; i++) {
-        char *section_name = start_name_section + section_table[i].sh_name;
-        printf("%2d | %20s | %6lx | %4lx | %4lu\n", i, section_name, section_table[i].sh_addr, section_table[i].sh_offset, section_table[i].sh_size);
+        // printf("%lx %lu\n", header32->e_shoff, header32->e_shoff);
+        // printf("%lx %lu\n", section_name->sh_offset, section_name->sh_offset);
+
+        printf("Type : %i\n", file[4]);
+        printf("Nb sections : %d\n", header32->e_shnum);
+        printf("Size sections : %d\n", header32->e_shentsize);
+        printf("index section name : %d\n\n", header32->e_shstrndx);
+    }
+    else if (file[4] == 2) {
+        header64 = (Elf64_Ehdr *)file;
+        section_table = (Elf64_Shdr *)(file + header64->e_shoff);
+        section_name = &((Elf64_Shdr *)section_table)[header64->e_shstrndx];
+        start_name_section = (char *)(file + ((Elf64_Shdr *)section_name)->sh_offset);
+        shnum = header64->e_shnum;
+
+        // printf("%lx %lu\n", header64->e_shoff, header64->e_shoff);
+        // printf("%lx %lu\n", section_name->sh_offset, section_name->sh_offset);
+
+        printf("Type : %i\n", file[4]);
+        printf("Nb sections : %d\n", header64->e_shnum);
+        printf("Size sections : %d\n", header64->e_shentsize);
+        printf("index section name : %d\n\n", header64->e_shstrndx);
+    }
+    else {
+        write(2, "Error header elf\n", 18);
+        return 1;
+    }
+
+    for (int i = 0; i < shnum; i++) {
+        if (file[4] == 1) {
+            Elf32_Shdr *section = &((Elf32_Shdr *)section_table)[i];
+            printf("%2d | %20s | %8x | %4x | %4u(dec) %6x(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
+        }
+        else {
+            Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
+            printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
+        }
     }
 
     // V2 sans header elf.h
     printf("\n\nSans header elf\n\n");
 
-    uint64_t type = file[4];
-    uint64_t size_section = file[58] | (file[59] << 8);
-    uint64_t number_section = file[60] | (file[61] << 8);
-    uint64_t index_section_name_section = file[62] | (file[63] << 8);
-    printf("Type : %lu\n", type);
-    printf("Section taille : %lu\n", size_section);
-    printf("Number section : %lu\n", number_section);
-    printf("index section name : %lu\n", index_section_name_section);
+    t_index_struct_elf elf;
+    t_index_program_header program; 
+    elf.architecture = file[4];
+    if (init_struct_elf_program(&elf, &program) < 0) {
+        write(2, "Error init struct elf\n", 22);
+        return 0;
+    }
+    
+    t_elf value_efl;
 
-    uint64_t offset_section_table = file[40] | ((uint64_t)file[41] << 8) | ((uint64_t)file[42] << 16) | ((uint64_t)file[43] << 24) | ((uint64_t)file[44] << 32) | ((uint64_t)file[45] << 40) | ((uint64_t)file[46] << 48) | ((uint64_t)file[47] << 56);
-    printf("offset section table : hex: %lx (dec: %li)\n", offset_section_table, offset_section_table);
+    value_efl.size_section = file[elf.size_section[0]] | (file[elf.size_section[1]] << 8);
+    value_efl.number_section = file[elf.number_section[0]] | (file[elf.number_section[1]] << 8);
+    value_efl.index_section_name_section = file[elf.num_section_name_section[0]] | (file[elf.num_section_name_section[1]] << 8);
+    printf("Type : %i\n", elf.architecture);
+    printf("Section taille : %lu\n", value_efl.size_section);
+    printf("Number section : %lu\n", value_efl.number_section);
+    printf("index section name : %lu\n", value_efl.index_section_name_section);
 
-    uint64_t section_name_entry_offset = offset_section_table + ((uint64_t)index_section_name_section * size_section);
-    uint64_t section_name_start =
-        ((uint64_t)file[section_name_entry_offset + 24]) |
-        ((uint64_t)file[section_name_entry_offset + 25] << 8) |
-        ((uint64_t)file[section_name_entry_offset + 26] << 16) |
-        ((uint64_t)file[section_name_entry_offset + 27] << 24) |
-        ((uint64_t)file[section_name_entry_offset + 28] << 32) |
-        ((uint64_t)file[section_name_entry_offset + 29] << 40) |
-        ((uint64_t)file[section_name_entry_offset + 30] << 48) |
-        ((uint64_t)file[section_name_entry_offset + 31] << 56);
+    value_efl.offset_section_table = extract_bytes(file, elf.offset_section_header[0], elf.offset_section_header[1], 0);
+    printf("offset section table : hex: %lx (dec: %li)\n", value_efl.offset_section_table, value_efl.offset_section_table);
 
-    uint64_t section_name_size =
-        ((uint64_t)file[section_name_entry_offset + 32]) |
-        ((uint64_t)file[section_name_entry_offset + 33] << 8) |
-        ((uint64_t)file[section_name_entry_offset + 34] << 16) |
-        ((uint64_t)file[section_name_entry_offset + 35] << 24) |
-        ((uint64_t)file[section_name_entry_offset + 36] << 32) |
-        ((uint64_t)file[section_name_entry_offset + 37] << 40) |
-        ((uint64_t)file[section_name_entry_offset + 38] << 48) |
-        ((uint64_t)file[section_name_entry_offset + 39] << 56);
+    value_efl.section_name_entry_offset = value_efl.offset_section_table + ((uint64_t)value_efl.index_section_name_section * value_efl.size_section);
+    value_efl.section_name_start = extract_bytes(file, program.offset[0], program.offset[1], value_efl.section_name_entry_offset);
+    char *all_section_name = (char *)(file + value_efl.section_name_start);
 
-    printf("offset section nom: hex: %lx (dec: %li)\n", section_name_start, section_name_start);
-    printf("size section nom: hex: %lx (dec: %li)\n", section_name_size, section_name_size);
+    printf("   |     addr | offs | size | name start | name\n");
+    for (int i = 0; i < value_efl.number_section; i++) {
+        size_t section_offset = value_efl.offset_section_table + (i * value_efl.size_section);
+        unsigned char *section = file + section_offset;
 
-    for (uint64_t i = section_name_start; i < section_name_start + section_name_size; i++) {
-        printf("%c", file[i]);
+        uint64_t sh_name = extract_bytes(file, program.sh_name[0], program.sh_name[1], section_offset);
+        uint64_t addr = extract_bytes(file, program.addr[0], program.addr[1], section_offset);
+        uint64_t offset = extract_bytes(file, program.offset[0], program.offset[1], section_offset);
+        uint64_t size = extract_bytes(file, program.size[0], program.size[1], section_offset);
+
+        char *name_section = all_section_name + sh_name;
+
+        printf("%2d | %8lx | %4lx | %4lu | %10lu | %s\n", i, addr, offset, size, sh_name, name_section);
+
+        if (!strcmp(name_section, ".text")) {
+            unsigned char *str_text = file + sh_name;
+            for (int i = 0; i < size; i++) {
+                printf("%02x ", str_text[i]);
+            }
+            printf("\n");
+        }
     }
     return 0;
 }
