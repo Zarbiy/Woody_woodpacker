@@ -25,6 +25,14 @@ typedef struct s_index_program_header {
     uint8_t size[2];
 } t_index_program_header;
 
+typedef struct s_index_symtab {
+    uint8_t st_name[2];
+    uint8_t st_info[2];
+    uint8_t st_other[2];
+    uint8_t st_shndx[2];
+    uint8_t st_value[2];
+    uint8_t st_size[2];
+} t_index_symtab;
 
 typedef struct s_elf {
     uint64_t type;
@@ -46,5 +54,8 @@ typedef struct s_section {
 } t_section;
 
 
+
+// init.c
+int init_struct_elf_program(t_index_struct_elf *elf, t_index_program_header *program, t_index_symtab *symtab);
 
 #endif

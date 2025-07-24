@@ -7,9 +7,9 @@ COLOR_BOLD = \033[1m
 MAKEFLAGS += --no-print-directory
 
 NAME		= woody_woodpacker
-SRC			= woody_packer.c
+SRC			= woody_packer.c init.c
 OBJ_DIR		= obj
-OBJS		= $(OBJ_DIR)/woody_packer.o
+OBJS		= $(OBJ_DIR)/woody_packer.o $(OBJ_DIR)/init.o
 
 CC			= cc
 CFLAGS		= -g3 #-Wall -Wextra -Werror
