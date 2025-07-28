@@ -8,33 +8,201 @@ uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t
     return result;
 }
 
-int main(int ac, char **av){
-    if (ac != 2) {
-        write(2, "Wrong number of argument !\n", 27);
-        return 0;
+unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size) {
+    const char new_data[] = "\x48\x31\xc0\x48\xc7\xc7\x01\x00\x00\x00\x48\x8d\x35\x05\x00\x00\x00\xba\x0f\x00\x00\x00\xb8\x01\x00\x00\x00\x0f\x05....WOODY....\n";
+    const char *new_section_name = ".func";
+    size_t new_data_size = sizeof(new_data) - 1;
+    size_t new_name_size = strlen(new_section_name) + 1;
+
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
+    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + elf->offset_section_table);
+    Elf64_Shdr *shstrtab = &sh_table[ehdr->e_shstrndx];
+
+    // === Etend .shstrtab
+    size_t name_offset = shstrtab->sh_size;
+    size_t shstrtab_end = shstrtab->sh_offset + shstrtab->sh_size;
+
+    // Alignement 8 pour la section .func
+    size_t align = 8;
+    size_t data_offset = (file_size + align - 1) & ~(align - 1);
+
+    size_t new_sh_offset = (data_offset + new_data_size + align - 1) & ~(align - 1);
+    *new_file_size = new_sh_offset + (ehdr->e_shnum + 1) * sizeof(Elf64_Shdr);
+
+    // create nouveau fichier
+    unsigned char *new_file = calloc(1, *new_file_size);
+    if (!new_file) 
+        return NULL;
+
+    // Copie copie dans le nouveau file
+    memcpy(new_file, file, file_size);
+
+    // add les nouvelles data
+    memcpy(new_file + data_offset, new_data, new_data_size);
+
+    // add le nom de la nouvelle section
+    memcpy(new_file + shstrtab_end, new_section_name, new_name_size);
+
+    // update size de .shstrtab
+    ((Elf64_Shdr *)(new_file + elf->offset_section_table))[ehdr->e_shstrndx].sh_size += new_name_size;
+
+    // Update la table des section du header
+    Elf64_Shdr *new_sh_table = (Elf64_Shdr *)(new_file + new_sh_offset);
+    memcpy(new_sh_table, file + elf->offset_section_table, ehdr->e_shnum * sizeof(Elf64_Shdr));
+
+    // add le header de la nouvelle section
+    Elf64_Shdr *new_sh = &new_sh_table[ehdr->e_shnum];
+    memset(new_sh, 0, sizeof(Elf64_Shdr));
+    new_sh->sh_name = name_offset;
+    new_sh->sh_type = SHT_PROGBITS;
+    new_sh->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+    new_sh->sh_offset = data_offset;
+    new_sh->sh_size = new_data_size;
+    new_sh->sh_addralign = 1;
+
+    Elf64_Phdr *phdr = (Elf64_Phdr *)(new_file + ehdr->e_phoff);
+    int found = 0;
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD && (phdr[i].p_flags & PF_X)) {
+            new_sh->sh_addr = phdr[i].p_vaddr + (new_sh->sh_offset - phdr[i].p_offset);
+            found = 1;
+            break;
+        }
     }
 
-    int fd = open(av[1], O_RDWR);
-    if (fd == -1){
-        perror("");
-        return 0;
-    }
-    long file_size = lseek(fd, 0, SEEK_END);
-    if (file_size <= 0){
-        write(2, "File empty\n", 11);
-        close(fd);
-        return 0;
+    if (!found) {
+        fprintf(stderr, "ERROR\n");
+        free(new_file);
+        return NULL;
     }
 
-    unsigned char *file = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-    if (file == MAP_FAILED) {
-        perror("mmap");
-        close(fd);
-        return 0;
+    // Update header ELF
+    ehdr = (Elf64_Ehdr *)new_file;
+    ehdr->e_shoff = new_sh_offset;
+    ehdr->e_shnum += 1;
+
+    // redirige au lancement sur l'adresse de ma fonction
+    ehdr->e_entry = new_sh->sh_addr;
+
+    return new_file;
+}
+
+unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size) {
+    // a modifier pour le 32 bits !!!!
+    const char new_data[] = "\x48\x31\xc0\x48\xc7\xc7\x01\x00\x00\x00\x48\x8d\x35\x05\x00\x00\x00\xba\x0f\x00\x00\x00\xb8\x01\x00\x00\x00\x0f\x05....WOODY....\n";
+    const char *new_section_name = ".func";
+    size_t new_data_size = sizeof(new_data) - 1;
+    size_t new_name_size = strlen(new_section_name) + 1;
+
+    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
+    Elf32_Shdr *sh_table = (Elf32_Shdr *)(file + elf->offset_section_table);
+    Elf32_Shdr *shstrtab = &sh_table[ehdr->e_shstrndx];
+
+    // === Etend .shstrtab
+    size_t name_offset = shstrtab->sh_size;
+    size_t shstrtab_end = shstrtab->sh_offset + shstrtab->sh_size;
+
+    // Alignement 4 pour la section .func
+    size_t align = 4;
+    size_t data_offset = (file_size + align - 1) & ~(align - 1);
+
+    size_t new_sh_offset = (data_offset + new_data_size + align - 1) & ~(align - 1);
+    *new_file_size = new_sh_offset + (ehdr->e_shnum + 1) * sizeof(Elf32_Shdr);
+
+    // create nouveau fichier
+    unsigned char *new_file = calloc(1, *new_file_size);
+    if (!new_file) 
+        return NULL;
+
+    // Copie copie dans le nouveau file
+    memcpy(new_file, file, file_size);
+
+    // add les nouvelles data
+    memcpy(new_file + data_offset, new_data, new_data_size);
+
+    // add le nom de la nouvelle section
+    memcpy(new_file + shstrtab_end, new_section_name, new_name_size);
+
+    // update size de .shstrtab
+    ((Elf32_Shdr *)(new_file + elf->offset_section_table))[ehdr->e_shstrndx].sh_size += new_name_size;
+
+    // Update la table des section du header
+    Elf32_Shdr *new_sh_table = (Elf32_Shdr *)(new_file + new_sh_offset);
+    memcpy(new_sh_table, file + elf->offset_section_table, ehdr->e_shnum * sizeof(Elf32_Shdr));
+
+    // add le header de la nouvelle section
+    Elf32_Shdr *new_sh = &new_sh_table[ehdr->e_shnum];
+    memset(new_sh, 0, sizeof(Elf32_Shdr));
+    new_sh->sh_name = name_offset;
+    new_sh->sh_type = SHT_PROGBITS;
+    new_sh->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+    new_sh->sh_offset = data_offset;
+    new_sh->sh_size = new_data_size;
+    new_sh->sh_addralign = 1;
+
+    Elf32_Phdr *phdr = (Elf32_Phdr *)(new_file + ehdr->e_phoff);
+    int found = 0;
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD && (phdr[i].p_flags & PF_X)) {
+            new_sh->sh_addr = phdr[i].p_vaddr + (new_sh->sh_offset - phdr[i].p_offset);
+            found = 1;
+            break;
+        }
     }
 
-    // V1 avec header elf.h
-    printf("Avec header elf\n\n");
+    if (!found) {
+        fprintf(stderr, "ERROR\n");
+        free(new_file);
+        return NULL;
+    }
+
+    // Update header ELF
+    ehdr = (Elf32_Ehdr *)new_file;
+    ehdr->e_shoff = new_sh_offset;
+    ehdr->e_shnum += 1;
+
+    // redirige au lancement sur l'adresse de ma fonction
+    ehdr->e_entry = new_sh->sh_addr;
+
+    return new_file;
+}
+
+void update_load_segment_to_execute_64(unsigned char *file, size_t file_size) {
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
+    Elf64_Phdr *phdr = (Elf64_Phdr *)(file + ehdr->e_phoff);
+
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD && (phdr[i].p_flags & PF_X)) {
+            size_t segment_end = phdr[i].p_offset + phdr[i].p_filesz;
+            if (file_size > segment_end) {
+                size_t extend_size = file_size - segment_end;
+                phdr[i].p_filesz += extend_size;
+                phdr[i].p_memsz += extend_size;
+            }
+            break;
+        }
+    }
+}
+
+void update_load_segment_to_execute_32(unsigned char *file, size_t file_size) {
+    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
+    Elf32_Phdr *phdr = (Elf32_Phdr *)(file + ehdr->e_phoff);
+
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD && (phdr[i].p_flags & PF_X)) {
+            size_t segment_end = phdr[i].p_offset + phdr[i].p_filesz;
+            if (file_size > segment_end) {
+                size_t extend_size = file_size - segment_end;
+                phdr[i].p_filesz += extend_size;
+                phdr[i].p_memsz += extend_size;
+            }
+            break;
+        }
+    }
+}
+
+int read_with_header(unsigned char *file) {
+    printf("\n\nAvec header elf\n\n");
     Elf32_Ehdr *header32 = NULL;
     Elf64_Ehdr *header64 = NULL;
     void *section_table = NULL;
@@ -74,19 +242,65 @@ int main(int ac, char **av){
     }
     else {
         write(2, "Error header elf\n", 18);
-        return 1;
+        return -1;
     }
 
     for (int i = 0; i < shnum; i++) {
         if (file[4] == 1) {
             Elf32_Shdr *section = &((Elf32_Shdr *)section_table)[i];
-            printf("%2d | %20s | %8x | %4x | %4u(dec) %6x(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
+            char *name_section = start_name_section + section->sh_name;
+            printf("%2d | %20s | %8x | %4x | %4u(dec) %6x(hex) | %i\n", i, name_section, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
+            if (!strcmp(name_section, ".func")) {
+                unsigned char *str_text = file + section->sh_offset;
+                for (int i = 0; i < section->sh_size; i++) {
+                    printf("%02x ", str_text[i]);
+                }
+                printf("\n");
+            }
         }
         else {
             Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
+            char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
+            if (!strcmp(name_section, ".func")) {
+                unsigned char *str_text = file + section->sh_offset;
+                for (int i = 0; i < section->sh_size; i++) {
+                    printf("%02x ", str_text[i]);
+                }
+                printf("\n");
+            }
         }
     }
+    return 0;
+}
+
+int main(int ac, char **av){
+    if (ac != 2) {
+        write(2, "Wrong number of argument !\n", 27);
+        return 0;
+    }
+
+    int fd = open(av[1], O_RDWR);
+    if (fd == -1){
+        perror("");
+        return 0;
+    }
+    unsigned long file_size = lseek(fd, 0, SEEK_END);
+    if (file_size <= 0){
+        write(2, "File empty\n", 11);
+        close(fd);
+        return 0;
+    }
+
+    unsigned char *file = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    if (file == MAP_FAILED) {
+        perror("mmap");
+        close(fd);
+        return 0;
+    }
+
+    // V1 avec header elf.h
+    read_with_header(file);
 
     // V2 sans header elf.h
     printf("\n\nSans header elf\n\n");
@@ -135,10 +349,21 @@ int main(int ac, char **av){
 
         printf("%2d | %8lx | %4lx | %4lu | %10lu | %s\n", i, addr, offset, size, sh_name, name_section);
 
+        if (!strcmp(name_section, ".rodata")) {
+            text_addr = addr;
+            text_offset = offset;
+            unsigned char *str_text = file + offset;
+            for (int i = 0; i < size; i++) {
+                printf("%02x ", str_text[i]);
+                // printf("%c ", str_text[i]);
+            }
+            printf("\n");
+        }
+
         if (!strcmp(name_section, ".text")) {
             text_addr = addr;
             text_offset = offset;
-            unsigned char *str_text = file + sh_name;
+            unsigned char *str_text = file + offset;
             for (int i = 0; i < size; i++) {
                 printf("%02x ", str_text[i]);
                 // printf("%c ", str_text[i]);
@@ -194,5 +419,24 @@ int main(int ac, char **av){
             }
         }
     }
+
+    unsigned long new_file_size = 0;
+    unsigned char *new_file;
+    if (elf.architecture == 1) {
+        new_file = add_section_32(file, &value_efl, file_size, &new_file_size);
+        update_load_segment_to_execute_32(new_file, new_file_size);
+    }
+    else if (elf.architecture == 2) {
+        new_file = add_section_64(file, &value_efl, file_size, &new_file_size);
+        update_load_segment_to_execute_64(new_file, new_file_size);
+    }
+
+    printf("\nTAILLE: file de base: %lu | New file size %lu\n", file_size, new_file_size);
+    read_with_header(new_file);
+
+    int fd_test = open("woody_test", O_CREAT | O_WRONLY | O_TRUNC, 0777);
+    write(fd_test, new_file, new_file_size);
+    close(fd_test);
+
     return 0;
 }

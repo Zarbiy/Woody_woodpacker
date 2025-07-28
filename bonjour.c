@@ -1,8 +1,10 @@
-#include <stdio.h>
+static int test;
+static int test1;
+static int test2;
+static int test3;
+static char buffer[1024];
 
 int main(){
-    printf("Bonjour je suis bob\n");
-    for(int i = 0; i < 10; i++)
-        printf("%d\n", i);
+write(1, "....WOODY.....\n", 15);
     return 0;
 }
