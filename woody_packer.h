@@ -62,15 +62,11 @@ uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t
 int read_elf_with_header(unsigned char *file);
 
 // function_32bits.c
-unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr);
-void update_load_segment_to_execute_32(unsigned char *file, Elf32_Off func_offset, Elf32_Word func_size);
-Elf32_Off get_file_offset_32(Elf32_Ehdr *ehdr, Elf32_Addr vaddr);
-void patch_entry_to_func_32(unsigned char *file, Elf32_Ehdr *ehdr, Elf32_Addr func_addr);
+size_t add_size_section_and_shift_32(unsigned char **pfile, size_t *pfile_size, size_t new_code_size);
+void update_size_pt_load_32(unsigned char *file, size_t new_code_size);
 
 // function_64bits.c
-unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr);
-void update_load_segment_to_execute_64(unsigned char *file, Elf64_Off func_offset, Elf64_Xword func_size);
-Elf64_Off get_file_offset_64(Elf64_Ehdr *ehdr, Elf64_Addr vaddr);
-void patch_entry_to_func_64(unsigned char *file, Elf64_Ehdr *ehdr, Elf64_Addr func_addr);
+size_t add_size_section_and_shift_64(unsigned char **pfile, size_t *pfile_size, size_t new_code_size);
+void update_size_pt_load_64(unsigned char *file, size_t new_code_size);
 
 #endif

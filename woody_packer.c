@@ -145,35 +145,24 @@ int main(int ac, char **av){
             }
         }
     }
-
-    unsigned char *new_file;
-    unsigned long new_file_size = 0;
     
-    if (elf.architecture == 1) {
-        Elf32_Off func_offset = 0;
-        Elf32_Xword func_size = 0;
-        Elf32_Addr func_vaddr = 0;
-        new_file = add_section_32(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr);
-        update_load_segment_to_execute_32(new_file, func_offset, func_size);
+    size_t offset_fin_text = 0;
+    size_t size_code_added = 20;
 
-        Elf32_Ehdr *ehdr_new = (Elf32_Ehdr *)new_file;
-        patch_entry_to_func_32(new_file, ehdr_new, func_vaddr);
+    if (elf.architecture == 1) {
+        offset_fin_text = add_size_section_and_shift_32(&file, &file_size, size_code_added);
+        update_size_pt_load_32(file, size_code_added);
     }
     else if (elf.architecture == 2) {
-        Elf64_Off func_offset = 0;
-        Elf64_Xword func_size = 0;
-        Elf64_Addr func_vaddr = 0;
-        new_file = add_section_64(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr);
-        update_load_segment_to_execute_64(new_file, func_offset, func_size);
-        
-        Elf64_Ehdr *ehdr_new = (Elf64_Ehdr *)new_file;
-        patch_entry_to_func_64(new_file, ehdr_new, func_vaddr);
+        offset_fin_text = add_size_section_and_shift_64(&file, &file_size, size_code_added);
+        update_size_pt_load_64(file, size_code_added);
     }
 
-    read_elf_with_header(new_file);
+    printf("offset_fin_text %lx (hex)", offset_fin_text);
+    read_elf_with_header(file);
 
     int fd_test = open("woody_test", O_CREAT | O_WRONLY | O_TRUNC, 0777);
-    write(fd_test, new_file, new_file_size);
+    write(fd_test, file, file_size);
     close(fd_test);
 
     return 0;
