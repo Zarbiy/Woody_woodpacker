@@ -5,6 +5,6 @@ static int test3;
 static char buffer[1024];
 
 int main(){
-write(1, "....WOODY.....\n", 15);
+write(1, "bonjour\n", 8);
     return 0;
 }
