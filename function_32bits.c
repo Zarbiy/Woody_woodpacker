@@ -10,8 +10,8 @@ size_t add_size_section_and_shift_32(unsigned char **pfile, size_t *pfile_size, 
     const char *shstrtab_p = (const char *)(file + shstrtab->sh_offset);
 
     if (ehdr->e_shoff + sizeof(Elf32_Shdr) * ehdr->e_shnum > file_size) {
-        printf("ERROR: section table outside file\n");
-        return 0;
+        printf("ERROR\n");
+        return -1;
     }
 
     // Trouver l'index de .text
@@ -24,8 +24,8 @@ size_t add_size_section_and_shift_32(unsigned char **pfile, size_t *pfile_size, 
         }
     }
     if (text_idx == -1) {
-        printf("ERROR: .text section not found\n");
-        return 0;
+        printf("ERROR\n");
+        return -1;
     }
 
     size_t old_text_size = sh_table[text_idx].sh_size;
@@ -35,8 +35,8 @@ size_t add_size_section_and_shift_32(unsigned char **pfile, size_t *pfile_size, 
     size_t new_size = file_size + new_code_size;
     unsigned char *new_file = calloc(1, new_size);
     if (!new_file) {
-        printf("ERROR: malloc failed\n");
-        return 0;
+        printf("ERROR\n");
+        return -1;
     }
 
     // Nouveau offset de la table des sections (on la decale après insertion)
@@ -101,7 +101,7 @@ void update_size_pt_load_32(unsigned char *file, size_t new_code_size) {
         }
     }
     if (text_idx == -1) {
-        printf("ERROR: .text section not found\n");
+        printf("ERROR\n");
         return;
     }
 
@@ -109,11 +109,10 @@ void update_size_pt_load_32(unsigned char *file, size_t new_code_size) {
     uint32_t text_start = text_section->sh_offset;
     uint32_t text_end = text_start + text_section->sh_size;
 
-    // Parcourir les segments
     for (int i = 0; i < ehdr->e_phnum; i++) {
         Elf32_Phdr *ph = &ph_table[i];
         if (ph->p_type == PT_LOAD && (ph->p_flags & PF_X)) {
-            printf("Modif segment %d\n", i);
+            // printf("Modif segment %d\n", i);
             ph->p_filesz += new_code_size;
             ph->p_memsz += new_code_size;
             break;

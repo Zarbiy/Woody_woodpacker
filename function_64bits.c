@@ -1,5 +1,138 @@
 #include "woody_packer.h"
 
+void fix_dynamic_entries_64(Elf64_Ehdr *ehdr, unsigned char *file, size_t delta) {
+    Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
+    Elf64_Dyn *dynamic = NULL;
+    size_t dyn_size = 0;
+
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        Elf64_Phdr *ph = &ph_table[i];
+        if (ph->p_type == PT_DYNAMIC) {
+            dynamic = (Elf64_Dyn *)(file + ph->p_offset);
+            dyn_size = ph->p_filesz;
+            break;
+        }
+    }
+    if (!dynamic) return;
+
+    size_t dyn_count = dyn_size / sizeof(Elf64_Dyn);
+    for (size_t i = 0; i < dyn_count; i++) {
+        switch (dynamic[i].d_tag) {
+            case DT_INIT:
+            case DT_FINI:
+            case DT_INIT_ARRAY:
+            case DT_FINI_ARRAY:
+            case DT_STRTAB:
+            case DT_SYMTAB:
+            case DT_JMPREL:
+            case DT_REL:
+            case DT_RELA:
+            case DT_PLTGOT:
+            case DT_VERDEF:
+            case DT_VERNEED:
+            case DT_VERSYM:
+            case DT_GNU_HASH:
+            case DT_HASH:
+                dynamic[i].d_un.d_ptr += delta;
+                break;
+
+            case DT_NEEDED:
+            case DT_SONAME:
+            case DT_RPATH:
+            case DT_RUNPATH:
+            case DT_VERNEEDNUM:
+                break;
+
+            default:
+                break;
+        }
+    }
+}
+
+void update_size_pt_load_64(unsigned char *file, size_t new_code_size) {
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
+    Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
+
+    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + ehdr->e_shoff);
+    Elf64_Shdr *shstrtab = &sh_table[ehdr->e_shstrndx];
+    const char *shstrtab_p = (const char *)(file + shstrtab->sh_offset);
+
+    int text_idx = -1;
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        const char *sec_name = shstrtab_p + sh_table[i].sh_name;
+        if (strcmp(sec_name, ".text") == 0) {
+            text_idx = i;
+            break;
+        }
+    }
+    if (text_idx == -1) {
+        fprintf(stderr, "ERROR: .text section not found\n");
+        return;
+    }
+
+    Elf64_Shdr *text_section = &sh_table[text_idx];
+    uint64_t text_start = text_section->sh_offset;
+    uint64_t text_end   = text_start + text_section->sh_size;
+
+    // agrandi pt_load de .text
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        Elf64_Phdr *ph = &ph_table[i];
+
+        if (ph->p_type == PT_LOAD &&
+            text_start >= ph->p_offset &&
+            text_start < ph->p_offset + ph->p_filesz) {
+            
+            ph->p_filesz += new_code_size;
+            ph->p_memsz  += new_code_size;
+        }
+        if (ph->p_type == PT_DYNAMIC) {
+            ph->p_offset += new_code_size;
+            ph->p_vaddr  += new_code_size;
+            ph->p_paddr  += new_code_size;
+        }
+    }
+
+    // update les autres pt_load
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        Elf64_Phdr *ph = &ph_table[i];
+        if (ph->p_type == PT_LOAD && ph->p_offset > text_start) {
+            ph->p_offset += new_code_size;
+            ph->p_vaddr += new_code_size;
+            ph->p_paddr += new_code_size;
+
+            size_t mod = ph->p_align;
+            size_t new_off = ph->p_offset;
+            size_t new_vaddr = ph->p_vaddr;
+
+            if ((new_off % mod) != (new_vaddr % mod)) {
+                size_t desired = new_vaddr % mod;
+                new_off = ((new_off / mod) * mod) + desired;
+                ph->p_offset = new_off;
+            }
+        }
+    }
+}
+
+
+void fix_section_addresses_64(Elf64_Ehdr *ehdr, unsigned char *file) {
+    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + ehdr->e_shoff);
+    Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
+
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        Elf64_Shdr *sh = &sh_table[i];
+
+        for (int j = 0; j < ehdr->e_phnum; j++) {
+            Elf64_Phdr *ph = &ph_table[j];
+            if (sh->sh_offset >= ph->p_offset &&
+                sh->sh_offset < ph->p_offset + ph->p_filesz) {
+
+                sh->sh_addr = ph->p_vaddr + (sh->sh_offset - ph->p_offset);
+                break;
+            }
+        }
+    }
+}
+
 size_t add_size_section_and_shift_64(unsigned char **pfile, size_t *pfile_size, size_t new_code_size) {
     unsigned char *file = *pfile;
     size_t file_size = *pfile_size;
@@ -80,43 +213,10 @@ size_t add_size_section_and_shift_64(unsigned char **pfile, size_t *pfile_size, 
     *pfile = new_file;
     *pfile_size = new_size;
 
+    update_size_pt_load_64(new_file, new_code_size);
+    fix_section_addresses_64(new_ehdr, new_file);
+    fix_dynamic_entries_64(new_ehdr, new_file, new_code_size);
+
     // Retourner l'offset dans le nouveau fichier où inserer ton nouveau code (fin ancienne .text)
     return copy_until;
-}
-
-void update_size_pt_load_64(unsigned char *file, size_t new_code_size) {
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
-    Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
-
-    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + ehdr->e_shoff);
-    Elf64_Shdr *shstrtab = &sh_table[ehdr->e_shstrndx];
-    const char *shstrtab_p = (const char *)(file + shstrtab->sh_offset);
-
-    int text_idx = -1;
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        const char *sec_name = shstrtab_p + sh_table[i].sh_name;
-        if (strcmp(sec_name, ".text") == 0) {
-            text_idx = i;
-            break;
-        }
-    }
-    if (text_idx == -1) {
-        printf("ERROR: .text section not found\n");
-        return;
-    }
-
-    Elf64_Shdr *text_section = &sh_table[text_idx];
-    uint64_t text_start = text_section->sh_offset;
-    uint64_t text_end = text_start + text_section->sh_size;
-
-    // Parcourir les segments
-    for (int i = 0; i < ehdr->e_phnum; i++) {
-        Elf64_Phdr *ph = &ph_table[i];
-        if (ph->p_type == PT_LOAD && (ph->p_flags & PF_X)) {
-            printf("Modifying segment %d\n", i);
-            ph->p_filesz += new_code_size;
-            ph->p_memsz += new_code_size;
-            break;
-        }
-    }
 }

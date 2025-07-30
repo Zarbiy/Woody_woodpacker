@@ -151,14 +151,18 @@ int main(int ac, char **av){
 
     if (elf.architecture == 1) {
         offset_fin_text = add_size_section_and_shift_32(&file, &file_size, size_code_added);
+        if (offset_fin_text == -1)
+            return 0;
         update_size_pt_load_32(file, size_code_added);
     }
     else if (elf.architecture == 2) {
         offset_fin_text = add_size_section_and_shift_64(&file, &file_size, size_code_added);
-        update_size_pt_load_64(file, size_code_added);
     }
+    printf("offset_fin_text: %lx | offset + size code: %lx (hex)", offset_fin_text, offset_fin_text + size_code_added);
 
-    printf("offset_fin_text %lx (hex)", offset_fin_text);
+    unsigned char new_code[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+    memcpy(file + offset_fin_text, new_code, sizeof(new_code));
+
     read_elf_with_header(file);
 
     int fd_test = open("woody_test", O_CREAT | O_WRONLY | O_TRUNC, 0777);

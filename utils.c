@@ -69,7 +69,7 @@ int read_elf_with_header(unsigned char *file) {
             Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            if (!strcmp(name_section, ".func")) {
+            if (!strcmp(name_section, ".text")) {
                 unsigned char *str_text = file + section->sh_offset;
                 for (int i = 0; i < section->sh_size; i++) {
                     printf("%02x ", str_text[i]);
