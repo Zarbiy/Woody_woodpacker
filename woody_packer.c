@@ -163,15 +163,11 @@ int main(int ac, char **av){
         new_file = add_section_64(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr);
         // printf("offset:%lx, size:%lx, addr:%lx\n", func_offset, func_size, func_vaddr);
     }
-    printf("offset_fin_text: %lx | offset + size code: %lx (hex)", offset_fin_text, offset_fin_text + size_code_added);
 
-    unsigned char new_code[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
-    memcpy(file + offset_fin_text, new_code, sizeof(new_code));
-
-    read_elf_with_header(file);
+    read_elf_with_header(new_file);
 
     int fd_test = open("woody_test", O_CREAT | O_WRONLY | O_TRUNC, 0777);
-    write(fd_test, file, file_size);
+    write(fd_test, new_file, new_file_size);
     close(fd_test);
 
     return 0;
