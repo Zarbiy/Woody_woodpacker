@@ -13,34 +13,38 @@ void fix_dynamic_entries_64(Elf64_Ehdr *ehdr, unsigned char *file, size_t delta)
             break;
         }
     }
-    if (!dynamic) return;
+    if (!dynamic)
+        return;
 
     size_t dyn_count = dyn_size / sizeof(Elf64_Dyn);
     for (size_t i = 0; i < dyn_count; i++) {
+        if (dynamic[i].d_tag == DT_NULL)
+            break;
+
         switch (dynamic[i].d_tag) {
             case DT_INIT:
             case DT_FINI:
             case DT_INIT_ARRAY:
             case DT_FINI_ARRAY:
-            case DT_STRTAB:
-            case DT_SYMTAB:
-            case DT_JMPREL:
+            // case DT_SYMTAB:
+            // case DT_STRTAB:
+            // case DT_JMPREL:
             case DT_REL:
             case DT_RELA:
             case DT_PLTGOT:
-            case DT_VERDEF:
-            case DT_VERNEED:
-            case DT_VERSYM:
             case DT_GNU_HASH:
             case DT_HASH:
-                dynamic[i].d_un.d_ptr += delta;
+            dynamic[i].d_un.d_ptr += delta;
                 break;
-
-            case DT_NEEDED:
-            case DT_SONAME:
-            case DT_RPATH:
-            case DT_RUNPATH:
-            case DT_VERNEEDNUM:
+            
+            case DT_VERSYM:
+            case DT_VERNEED:
+            case DT_VERDEF:
+            case DT_RELAENT:
+            case DT_SYMENT:
+            case DT_STRSZ:
+            case DT_PLTRELSZ:
+            case DT_RELASZ:
                 break;
 
             default:
@@ -49,7 +53,7 @@ void fix_dynamic_entries_64(Elf64_Ehdr *ehdr, unsigned char *file, size_t delta)
     }
 }
 
-void update_size_pt_load_64(unsigned char *file, size_t new_code_size) {
+void update_size_pt_load_64(unsigned char *file, size_t new_code_size, size_t *delta_dynamic_vaddr) {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
     Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
 
@@ -75,22 +79,35 @@ void update_size_pt_load_64(unsigned char *file, size_t new_code_size) {
     uint64_t text_end   = text_start + text_section->sh_size;
 
     // agrandi pt_load de .text
+    Elf64_Off old_vaddr_dynamic = 0;
+    Elf64_Off new_vaddr_dynamic = 0;
+
     for (int i = 0; i < ehdr->e_phnum; i++) {
         Elf64_Phdr *ph = &ph_table[i];
 
         if (ph->p_type == PT_LOAD &&
             text_start >= ph->p_offset &&
             text_start < ph->p_offset + ph->p_filesz) {
-            
+
             ph->p_filesz += new_code_size;
             ph->p_memsz  += new_code_size;
         }
-        if (ph->p_type == PT_DYNAMIC) {
+
+        if (ph->p_type == PT_DYNAMIC && ph->p_offset > text_end) {
+            old_vaddr_dynamic = ph->p_vaddr;
+
             ph->p_offset += new_code_size;
             ph->p_vaddr  += new_code_size;
             ph->p_paddr  += new_code_size;
+
+            new_vaddr_dynamic = ph->p_vaddr;
         }
     }
+
+    if (old_vaddr_dynamic && new_vaddr_dynamic)
+        *delta_dynamic_vaddr = new_vaddr_dynamic - old_vaddr_dynamic;
+    else
+        *delta_dynamic_vaddr = new_code_size;
 
     // update les autres pt_load
     for (int i = 0; i < ehdr->e_phnum; i++) {
@@ -104,15 +121,16 @@ void update_size_pt_load_64(unsigned char *file, size_t new_code_size) {
             size_t new_off = ph->p_offset;
             size_t new_vaddr = ph->p_vaddr;
 
-            if ((new_off % mod) != (new_vaddr % mod)) {
-                size_t desired = new_vaddr % mod;
-                new_off = ((new_off / mod) * mod) + desired;
-                ph->p_offset = new_off;
+            if ((ph->p_offset % ph->p_align) != (ph->p_vaddr % ph->p_align)) {
+                size_t align_diff = (ph->p_vaddr % ph->p_align) - (ph->p_offset % ph->p_align);
+                if ((ssize_t)align_diff < 0)
+                    align_diff += ph->p_align;
+                ph->p_offset += align_diff;
             }
+
         }
     }
 }
-
 
 void fix_section_addresses_64(Elf64_Ehdr *ehdr, unsigned char *file) {
     Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + ehdr->e_shoff);
@@ -213,9 +231,12 @@ size_t add_size_section_and_shift_64(unsigned char **pfile, size_t *pfile_size, 
     *pfile = new_file;
     *pfile_size = new_size;
 
-    update_size_pt_load_64(new_file, new_code_size);
+    size_t delta_dynamic_vaddr = 0;
+
+    update_size_pt_load_64(new_file, new_code_size, &delta_dynamic_vaddr);
     fix_section_addresses_64(new_ehdr, new_file);
-    fix_dynamic_entries_64(new_ehdr, new_file, new_code_size);
+
+    fix_dynamic_entries_64(new_ehdr, new_file, delta_dynamic_vaddr);
 
     // Retourner l'offset dans le nouveau fichier où inserer ton nouveau code (fin ancienne .text)
     return copy_until;

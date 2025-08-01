@@ -54,7 +54,12 @@ show_elf:
 	@printf "$(COLOR_RED)  --------------------------------  $(COLOR_RESET)\n"
 	readelf -S $(NAME_PACKER)
 
-all_show: show_info_elf show_ptload show_elf
+show_dynamic:
+	readelf -d $(NAME_EXEC_64)
+	@printf "$(COLOR_RED)  --------------------------------  $(COLOR_RESET)\n"
+	readelf -d $(NAME_PACKER)
+
+all_show: show_info_elf show_ptload show_elf show_dynamic
 
 clean:
 	@$(RM) $(OBJS)

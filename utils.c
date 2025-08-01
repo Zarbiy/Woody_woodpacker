@@ -9,7 +9,7 @@ uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t
 }
 
 int read_elf_with_header(unsigned char *file) {
-    printf("\n\nAvec header elf\n\n");
+    printf("Avec header elf\n\n");
     Elf32_Ehdr *header32 = NULL;
     Elf64_Ehdr *header64 = NULL;
     void *section_table = NULL;
@@ -57,7 +57,7 @@ int read_elf_with_header(unsigned char *file) {
             Elf32_Shdr *section = &((Elf32_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8x | %4x | %4u(dec) %6x(hex) | %i\n", i, name_section, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            if (!strcmp(name_section, ".func")) {
+            if (!strcmp(name_section, ".dynamic") || !strcmp(name_section, ".text")) {
                 unsigned char *str_text = file + section->sh_offset;
                 for (int i = 0; i < section->sh_size; i++) {
                     printf("%02x ", str_text[i]);
@@ -69,13 +69,13 @@ int read_elf_with_header(unsigned char *file) {
             Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            if (!strcmp(name_section, ".text")) {
-                unsigned char *str_text = file + section->sh_offset;
-                for (int i = 0; i < section->sh_size; i++) {
-                    printf("%02x ", str_text[i]);
-                }
-                printf("\n");
-            }
+            // if (!strcmp(name_section, ".dynamic") || !strcmp(name_section, ".text")) {
+            //     unsigned char *str_text = file + section->sh_offset;
+            //     for (int i = 0; i < section->sh_size; i++) {
+            //         printf("%02x ", str_text[i]);
+            //     }
+            //     printf("\n");
+            // }
         }
     }
     return 0;

@@ -67,6 +67,5 @@ void update_size_pt_load_32(unsigned char *file, size_t new_code_size);
 
 // function_64bits.c
 size_t add_size_section_and_shift_64(unsigned char **pfile, size_t *pfile_size, size_t new_code_size);
-void update_size_pt_load_64(unsigned char *file, size_t new_code_size);
 
 #endif
