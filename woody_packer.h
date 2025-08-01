@@ -62,10 +62,9 @@ uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t
 int read_elf_with_header(unsigned char *file);
 
 // function_32bits.c
-size_t add_size_section_and_shift_32(unsigned char **pfile, size_t *pfile_size, size_t new_code_size);
-void update_size_pt_load_32(unsigned char *file, size_t new_code_size);
+unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr);
 
 // function_64bits.c
-size_t add_size_section_and_shift_64(unsigned char **pfile, size_t *pfile_size, size_t new_code_size);
+unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr);
 
 #endif

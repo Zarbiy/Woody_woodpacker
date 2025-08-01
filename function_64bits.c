@@ -1,243 +1,98 @@
 #include "woody_packer.h"
 
-void fix_dynamic_entries_64(Elf64_Ehdr *ehdr, unsigned char *file, size_t delta) {
-    Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
-    Elf64_Dyn *dynamic = NULL;
-    size_t dyn_size = 0;
-
-    for (int i = 0; i < ehdr->e_phnum; i++) {
-        Elf64_Phdr *ph = &ph_table[i];
-        if (ph->p_type == PT_DYNAMIC) {
-            dynamic = (Elf64_Dyn *)(file + ph->p_offset);
-            dyn_size = ph->p_filesz;
-            break;
-        }
-    }
-    if (!dynamic)
-        return;
-
-    size_t dyn_count = dyn_size / sizeof(Elf64_Dyn);
-    for (size_t i = 0; i < dyn_count; i++) {
-        if (dynamic[i].d_tag == DT_NULL)
-            break;
-
-        switch (dynamic[i].d_tag) {
-            case DT_INIT:
-            case DT_FINI:
-            case DT_INIT_ARRAY:
-            case DT_FINI_ARRAY:
-            // case DT_SYMTAB:
-            // case DT_STRTAB:
-            // case DT_JMPREL:
-            case DT_REL:
-            case DT_RELA:
-            case DT_PLTGOT:
-            case DT_GNU_HASH:
-            case DT_HASH:
-            dynamic[i].d_un.d_ptr += delta;
-                break;
-            
-            case DT_VERSYM:
-            case DT_VERNEED:
-            case DT_VERDEF:
-            case DT_RELAENT:
-            case DT_SYMENT:
-            case DT_STRSZ:
-            case DT_PLTRELSZ:
-            case DT_RELASZ:
-                break;
-
-            default:
-                break;
-        }
-    }
-}
-
 void update_size_pt_load_64(unsigned char *file, size_t new_code_size, size_t *delta_dynamic_vaddr) {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
     Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
 
-    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + ehdr->e_shoff);
-    Elf64_Shdr *shstrtab = &sh_table[ehdr->e_shstrndx];
-    const char *shstrtab_p = (const char *)(file + shstrtab->sh_offset);
-
-    int text_idx = -1;
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        const char *sec_name = shstrtab_p + sh_table[i].sh_name;
-        if (strcmp(sec_name, ".text") == 0) {
-            text_idx = i;
-            break;
-        }
-    }
-    if (text_idx == -1) {
-        fprintf(stderr, "ERROR: .text section not found\n");
-        return;
-    }
-
-    Elf64_Shdr *text_section = &sh_table[text_idx];
-    uint64_t text_start = text_section->sh_offset;
-    uint64_t text_end   = text_start + text_section->sh_size;
-
-    // agrandi pt_load de .text
-    Elf64_Off old_vaddr_dynamic = 0;
-    Elf64_Off new_vaddr_dynamic = 0;
+    // Trouver dernier PT_LOAD, son adresse de base (p_vaddr - p_offset) et ses limites
+    Elf64_Addr max_vaddr = 0;
+    Elf64_Off max_offset = 0;
+    Elf64_Addr base_vaddr = 0;
 
     for (int i = 0; i < ehdr->e_phnum; i++) {
-        Elf64_Phdr *ph = &ph_table[i];
-
-        if (ph->p_type == PT_LOAD &&
-            text_start >= ph->p_offset &&
-            text_start < ph->p_offset + ph->p_filesz) {
-
-            ph->p_filesz += new_code_size;
-            ph->p_memsz  += new_code_size;
-        }
-
-        if (ph->p_type == PT_DYNAMIC && ph->p_offset > text_end) {
-            old_vaddr_dynamic = ph->p_vaddr;
-
-            ph->p_offset += new_code_size;
-            ph->p_vaddr  += new_code_size;
-            ph->p_paddr  += new_code_size;
-
-            new_vaddr_dynamic = ph->p_vaddr;
-        }
-    }
-
-    if (old_vaddr_dynamic && new_vaddr_dynamic)
-        *delta_dynamic_vaddr = new_vaddr_dynamic - old_vaddr_dynamic;
-    else
-        *delta_dynamic_vaddr = new_code_size;
-
-    // update les autres pt_load
-    for (int i = 0; i < ehdr->e_phnum; i++) {
-        Elf64_Phdr *ph = &ph_table[i];
-        if (ph->p_type == PT_LOAD && ph->p_offset > text_start) {
-            ph->p_offset += new_code_size;
-            ph->p_vaddr += new_code_size;
-            ph->p_paddr += new_code_size;
-
-            size_t mod = ph->p_align;
-            size_t new_off = ph->p_offset;
-            size_t new_vaddr = ph->p_vaddr;
-
-            if ((ph->p_offset % ph->p_align) != (ph->p_vaddr % ph->p_align)) {
-                size_t align_diff = (ph->p_vaddr % ph->p_align) - (ph->p_offset % ph->p_align);
-                if ((ssize_t)align_diff < 0)
-                    align_diff += ph->p_align;
-                ph->p_offset += align_diff;
-            }
-
-        }
-    }
-}
-
-void fix_section_addresses_64(Elf64_Ehdr *ehdr, unsigned char *file) {
-    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + ehdr->e_shoff);
-    Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
-
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        Elf64_Shdr *sh = &sh_table[i];
-
-        for (int j = 0; j < ehdr->e_phnum; j++) {
-            Elf64_Phdr *ph = &ph_table[j];
-            if (sh->sh_offset >= ph->p_offset &&
-                sh->sh_offset < ph->p_offset + ph->p_filesz) {
-
-                sh->sh_addr = ph->p_vaddr + (sh->sh_offset - ph->p_offset);
-                break;
+        if (ph_table[i].p_type == PT_LOAD) {
+            Elf64_Addr end_vaddr = ph_table[i].p_vaddr + ph_table[i].p_memsz;
+            Elf64_Off end_offset = ph_table[i].p_offset + ph_table[i].p_filesz;
+            if (end_vaddr > max_vaddr) {
+                max_vaddr = end_vaddr;
+                max_offset = end_offset;
+                base_vaddr = ph_table[i].p_vaddr - ph_table[i].p_offset;
             }
         }
     }
-}
 
-size_t add_size_section_and_shift_64(unsigned char **pfile, size_t *pfile_size, size_t new_code_size) {
-    unsigned char *file = *pfile;
-    size_t file_size = *pfile_size;
+    Elf64_Off aligned_max_offset = (max_offset + align - 1) & ~(align - 1);
+    Elf64_Addr new_vaddr = base_vaddr + aligned_max_offset;
+    Elf64_Off code_offset = aligned_max_offset; // offset dans le fichier aligné
 
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
-    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + ehdr->e_shoff);
+    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + elf->offset_section_table);
     Elf64_Shdr *shstrtab = &sh_table[ehdr->e_shstrndx];
     const char *shstrtab_p = (const char *)(file + shstrtab->sh_offset);
 
-    if (ehdr->e_shoff + sizeof(Elf64_Shdr) * ehdr->e_shnum > file_size) {
-        printf("ERROR\n");
-        return -1;
-    }
+    size_t shstrtab_offset = shstrtab->sh_offset;
+    size_t name_offset = shstrtab->sh_size;
 
-    // Trouver l'index de .text
-    int text_idx = -1;
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        const char *sec_name = shstrtab_p + sh_table[i].sh_name;
-        if (strcmp(sec_name, ".text") == 0) {
-            text_idx = i;
-            break;
-        }
-    }
-    if (text_idx == -1) {
-        printf("ERROR\n");
-        return -1;
-    }
+    size_t min_needed = shstrtab_offset + shstrtab->sh_size + new_name_size;
+    size_t new_section_table_offset = (code_offset + new_data_size + align - 1) & ~(align - 1);
+    size_t new_ph_table_offset = new_section_table_offset + (ehdr->e_shnum + 1) * sizeof(Elf64_Shdr);
+    size_t phdr_end = new_ph_table_offset + (ehdr->e_phnum + 1) * sizeof(Elf64_Phdr);
+    if (*new_file_size < min_needed)
+        *new_file_size = min_needed;
+    if (*new_file_size < phdr_end)
+        *new_file_size = phdr_end;
 
-    size_t old_text_size = sh_table[text_idx].sh_size;
-    size_t old_text_offset = sh_table[text_idx].sh_offset;
+    unsigned char *new_file = calloc(1, *new_file_size);
+    if (!new_file)
+        return NULL;
 
-    // Nouvelle taille du fichier = ancienne + taille ajoutee dans .text
-    size_t new_size = file_size + new_code_size;
-    unsigned char *new_file = calloc(1, new_size);
-    if (!new_file) {
-        printf("ERROR\n");
-        return -1;
-    }
+    memcpy(new_file, file, file_size);
 
-    // Nouveau offset de la table des sections (on la decale après insertion)
-    size_t old_shoff = ehdr->e_shoff;
-    size_t new_shoff = old_shoff + new_code_size;
+    memcpy(new_file + code_offset, new_data, new_data_size);
 
-    // 1) Copier tout le contenu jusqu'a la fin de .text (ancienne fin)
-    size_t copy_until = old_text_offset + old_text_size;
-    memcpy(new_file, file, copy_until);
+    memcpy(new_file + shstrtab_offset, file + shstrtab_offset, shstrtab->sh_size);
+    memcpy(new_file + shstrtab_offset + name_offset, new_section_name, new_name_size);
 
-    // 2) Copier le reste du fichier (tout après .text) a sa nouvelle position decalee
-    size_t rest_offset = copy_until;
-    size_t rest_size = file_size - rest_offset;
-    memcpy(new_file + rest_offset + new_code_size, file + rest_offset, rest_size);
+    Elf64_Shdr *new_sh_table = (Elf64_Shdr *)(new_file + new_section_table_offset);
+    memcpy(new_sh_table, sh_table, ehdr->e_shnum * sizeof(Elf64_Shdr));
 
-    // 3) Copier la table des sections a sa nouvelle position decalee
-    memcpy(new_file + new_shoff, file + old_shoff, sizeof(Elf64_Shdr) * ehdr->e_shnum);
+    Elf64_Shdr *new_sh = &new_sh_table[ehdr->e_shnum];
+    memset(new_sh, 0, sizeof(Elf64_Shdr));
+    new_sh->sh_name = name_offset;
+    new_sh->sh_type = SHT_PROGBITS;
+    new_sh->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+    new_sh->sh_offset = code_offset;
+    new_sh->sh_addr = new_vaddr;
+    new_sh->sh_size = new_data_size;
+    new_sh->sh_addralign = 16;
 
-    // 4) Mettre a jour le header ELF dans new_file
+    Elf64_Shdr *new_shstrtab = &new_sh_table[ehdr->e_shstrndx];
+    new_shstrtab->sh_offset = shstrtab_offset;
+    new_shstrtab->sh_size += new_name_size;
+
+    Elf64_Phdr *new_ph_table = (Elf64_Phdr *)(new_file + new_ph_table_offset);
+    memcpy(new_ph_table, ph_table, ehdr->e_phnum * sizeof(Elf64_Phdr));
+
+    Elf64_Phdr *new_ph = &new_ph_table[ehdr->e_phnum];
+    memset(new_ph, 0, sizeof(Elf64_Phdr));
+    new_ph->p_type = PT_LOAD;
+    new_ph->p_offset = code_offset;
+    new_ph->p_vaddr = new_vaddr;
+    new_ph->p_paddr = new_vaddr;
+    new_ph->p_filesz = new_data_size;
+    new_ph->p_memsz = new_data_size;
+    new_ph->p_flags = PF_R | PF_X;
+    new_ph->p_align = align;
+
     Elf64_Ehdr *new_ehdr = (Elf64_Ehdr *)new_file;
-    new_ehdr->e_shoff = new_shoff;
+    new_ehdr->e_shoff = new_section_table_offset;
+    new_ehdr->e_shnum += 1;
+    new_ehdr->e_phoff = new_ph_table_offset;
+    new_ehdr->e_phnum += 1;
 
-    // 5) Modifier la table des sections dans new_file
-    Elf64_Shdr *new_sh_table = (Elf64_Shdr *)(new_file + new_shoff);
+    *func_vaddr = new_sh->sh_addr;
+    *func_offset = new_sh->sh_offset;
+    *func_size = new_sh->sh_size;
 
-    // Agrandir la section .text
-    new_sh_table[text_idx].sh_size += new_code_size;
-
-    // Decaler les sections qui viennent APRES .text dans le fichier
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        if (i == text_idx) continue;
-        if (new_sh_table[i].sh_offset > old_text_offset) {
-            new_sh_table[i].sh_offset += new_code_size;
-        }
-    }
-
-    // 6) Liberer l'ancien fichier (qui venait de mmap)
-    munmap(file, file_size);
-
-    // 7) Remplacer pointeurs et taille
-    *pfile = new_file;
-    *pfile_size = new_size;
-
-    size_t delta_dynamic_vaddr = 0;
-
-    update_size_pt_load_64(new_file, new_code_size, &delta_dynamic_vaddr);
-    fix_section_addresses_64(new_ehdr, new_file);
-
-    fix_dynamic_entries_64(new_ehdr, new_file, delta_dynamic_vaddr);
-
-    // Retourner l'offset dans le nouveau fichier où inserer ton nouveau code (fin ancienne .text)
-    return copy_until;
+    return new_file;
 }
+
