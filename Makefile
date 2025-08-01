@@ -23,6 +23,8 @@ NAME_FILE = bonjour.c
 NAME_EXEC_64 = exec64
 NAME_EXEC_32 = exec32
 
+NAME_PACKER = woody_test
+
 all: $(NAME)
 
 $(NAME): $(OBJS) woody_packer.h
@@ -37,11 +39,33 @@ exec:
 	cc -m32 $(NAME_FILE) -o $(NAME_EXEC_32)
 	cc $(NAME_FILE) -o $(NAME_EXEC_64)
 
+show_info_elf:
+	readelf -h $(NAME_EXEC_64)
+	@printf "$(COLOR_RED)  --------------------------------  $(COLOR_RESET)\n"
+	readelf -h $(NAME_PACKER)
+
+show_ptload:
+	readelf -l $(NAME_EXEC_64)
+	@printf "$(COLOR_RED)  --------------------------------  $(COLOR_RESET)\n"
+	readelf -l $(NAME_PACKER)
+
+show_elf:
+	readelf -S $(NAME_EXEC_64)
+	@printf "$(COLOR_RED)  --------------------------------  $(COLOR_RESET)\n"
+	readelf -S $(NAME_PACKER)
+
+show_dynamic:
+	readelf -d $(NAME_EXEC_64)
+	@printf "$(COLOR_RED)  --------------------------------  $(COLOR_RESET)\n"
+	readelf -d $(NAME_PACKER)
+
+all_show: show_info_elf show_ptload show_elf show_dynamic
+
 clean:
 	@$(RM) $(OBJS)
 
 fclean: clean
-	@$(RM) $(NAME) $(NAME_EXEC_32) $(NAME_EXEC_64) woody_test
+	@$(RM) $(NAME) $(NAME_EXEC_32) $(NAME_EXEC_64) $(NAME_PACKER)
 
 
 re: fclean all
