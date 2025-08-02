@@ -1,113 +1,109 @@
 #include "woody_packer.h"
 
 unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr) {
-    const char new_data[] =
-        "\x48\x31\xc0"                  // xor    rax, rax
-        "\x48\xc7\xc7\x01\x00\x00\x00"  // mov    rdi, 1
-        "\x48\x8d\x35\x20\x00\x00\x00"  // lea    rsi, [rip+0x20]
-        "\xba\x0f\x00\x00\x00"          // mov    edx, 14
-        "\xb8\x01\x00\x00\x00"          // mov    eax, 1
-        "\x0f\x05"                      // syscall (write)
-        "\x48\x31\xff"                  // xor    edi, edi
-        "\xb8\x3c\x00\x00\x00"          // mov    eax, 60
-        "\x0f\x05"                      // syscall (exit)
-        "....WOODY....\n";
+    const unsigned char payload_write_woody[] =
+    "\x48\x31\xc0"                  // xor rax, rax
+    "\x48\xc7\xc7\x01\x00\x00\x00"  // mov rdi, 1
+    "\x48\x8d\x35\x16\x00\x00\x00"  // lea rsi, [rip + 22]
+    "\xba\x0e\x00\x00\x00"          // mov edx, 14
+    "\xb8\x01\x00\x00\x00"          // mov eax, 1
+    "\x0f\x05"                      // syscall
+    "\x48\x31\xff"                  // xor rdi, rdi
+    "\xb8\x3c\x00\x00\x00"          // mov eax, 60
+    "\x0f\x05"                      // syscall
+    "....WOODY....\n";
 
-    const char *new_section_name = ".add";
-    size_t new_data_size = sizeof(new_data) - 1;
-    size_t new_name_size = strlen(new_section_name) + 1;
-    size_t align = 0x1000;
+    const char new_section_name[] = ".test";
+
+    size_t payload_size = sizeof(payload_write_woody) - 1; // Sans le \0 final
+    size_t new_section_name_len = strlen(new_section_name) + 1; // inclure le '\0'
 
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
-    Elf64_Phdr *ph_table = (Elf64_Phdr *)(file + ehdr->e_phoff);
+    Elf64_Phdr *phdr = (Elf64_Phdr *)(file + ehdr->e_phoff);
+    Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
 
-    // Trouver dernier PT_LOAD, son adresse de base (p_vaddr - p_offset) et ses limites
-    Elf64_Addr max_vaddr = 0;
-    Elf64_Off max_offset = 0;
-    Elf64_Addr base_vaddr = 0;
-
+    // Trouver un PT_LOAD exécutable
+    Elf64_Phdr *exec_segment = NULL;
     for (int i = 0; i < ehdr->e_phnum; i++) {
-        if (ph_table[i].p_type == PT_LOAD) {
-            Elf64_Addr end_vaddr = ph_table[i].p_vaddr + ph_table[i].p_memsz;
-            Elf64_Off end_offset = ph_table[i].p_offset + ph_table[i].p_filesz;
-            if (end_vaddr > max_vaddr) {
-                max_vaddr = end_vaddr;
-                max_offset = end_offset;
-                base_vaddr = ph_table[i].p_vaddr - ph_table[i].p_offset;
-            }
+        if ((phdr[i].p_type == PT_LOAD) && (phdr[i].p_flags & PF_X)) {
+            exec_segment = &phdr[i];
+            break;
         }
     }
+    if (!exec_segment) {
+        write(2, "No executable PT_LOAD segment found\n", 36);
+        return NULL;
+    }
 
-    Elf64_Off aligned_max_offset = (max_offset + align - 1) & ~(align - 1);
-    Elf64_Addr new_vaddr = base_vaddr + aligned_max_offset;
-    Elf64_Off code_offset = aligned_max_offset; // offset dans le fichier aligné
+    // Trouver la section .shstrtab
+    Elf64_Shdr *shstrtab = &shdr[ehdr->e_shstrndx];
+    const char *old_shstrtab = (const char *)(file + shstrtab->sh_offset);
 
-    Elf64_Shdr *sh_table = (Elf64_Shdr *)(file + elf->offset_section_table);
-    Elf64_Shdr *shstrtab = &sh_table[ehdr->e_shstrndx];
+    // Calculer le nouvel offset pour injection payload
+    Elf64_Off injection_offset = exec_segment->p_offset + exec_segment->p_filesz;
+    Elf64_Addr injection_vaddr = exec_segment->p_vaddr + exec_segment->p_filesz;
 
-    size_t shstrtab_offset = shstrtab->sh_offset;
-    size_t name_offset = shstrtab->sh_size;
+    // Nouveau offset pour la .shstrtab étendue (après payload)
+    Elf64_Off new_shstrtab_offset = injection_offset + payload_size;
 
-    size_t min_needed = shstrtab_offset + shstrtab->sh_size + new_name_size;
-    size_t new_section_table_offset = (code_offset + new_data_size + align - 1) & ~(align - 1);
-    size_t new_ph_table_offset = new_section_table_offset + (ehdr->e_shnum + 1) * sizeof(Elf64_Shdr);
-    size_t phdr_end = new_ph_table_offset + (ehdr->e_phnum + 1) * sizeof(Elf64_Phdr);
-    if (*new_file_size < min_needed)
-        *new_file_size = min_needed;
-    if (*new_file_size < phdr_end)
-        *new_file_size = phdr_end;
+    // Nouvelle taille pour .shstrtab (ancienne taille + nouveau nom)
+    size_t new_shstrtab_size = shstrtab->sh_size + new_section_name_len;
 
-    unsigned char *new_file = calloc(1, *new_file_size);
+    // Taille totale du nouveau fichier :
+    // ancien fichier + payload + nouvelle section header + extension .shstrtab
+    size_t extended_size = file_size + payload_size + sizeof(Elf64_Shdr) + new_section_name_len;
+
+    unsigned char *new_file = calloc(1, extended_size);
     if (!new_file)
         return NULL;
 
+    // Copier l'ancien fichier dans le nouveau buffer
     memcpy(new_file, file, file_size);
 
-    memcpy(new_file + code_offset, new_data, new_data_size);
+    // Copier le payload à l'offset d'injection
+    memcpy(new_file + injection_offset, payload_write_woody, payload_size);
 
-    memcpy(new_file + shstrtab_offset, file + shstrtab_offset, shstrtab->sh_size);
-    memcpy(new_file + shstrtab_offset + name_offset, new_section_name, new_name_size);
+    // Mettre à jour le segment PT_LOAD exécutable pour inclure la payload
+    Elf64_Phdr *new_phdr = (Elf64_Phdr *)(new_file + ehdr->e_phoff);
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if ((new_phdr[i].p_type == PT_LOAD) && (new_phdr[i].p_flags & PF_X)) {
+            new_phdr[i].p_filesz += payload_size;
+            new_phdr[i].p_memsz += payload_size;
+            break;
+        }
+    }
 
-    Elf64_Shdr *new_sh_table = (Elf64_Shdr *)(new_file + new_section_table_offset);
-    memcpy(new_sh_table, sh_table, ehdr->e_shnum * sizeof(Elf64_Shdr));
+    // Copier et étendre .shstrtab à son nouvel emplacement
+    char *new_shstrtab = (char *)(new_file + new_shstrtab_offset);
+    memcpy(new_shstrtab, old_shstrtab, shstrtab->sh_size);
+    strcpy(new_shstrtab + shstrtab->sh_size, new_section_name);
 
-    Elf64_Shdr *new_sh = &new_sh_table[ehdr->e_shnum];
-    memset(new_sh, 0, sizeof(Elf64_Shdr));
-    new_sh->sh_name = name_offset;
-    new_sh->sh_type = SHT_PROGBITS;
-    new_sh->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
-    new_sh->sh_offset = code_offset;
-    new_sh->sh_addr = new_vaddr;
-    new_sh->sh_size = new_data_size;
-    new_sh->sh_addralign = 16;
+    // Mettre à jour le header de la .shstrtab
+    Elf64_Shdr *new_shdr = (Elf64_Shdr *)(new_file + ehdr->e_shoff);
+    new_shdr[ehdr->e_shstrndx].sh_offset = new_shstrtab_offset;
+    new_shdr[ehdr->e_shstrndx].sh_size = new_shstrtab_size;
 
-    Elf64_Shdr *new_shstrtab = &new_sh_table[ehdr->e_shstrndx];
-    new_shstrtab->sh_offset = shstrtab_offset;
-    new_shstrtab->sh_size += new_name_size;
+    // Ajouter la nouvelle section à la table des sections
+    int shnum = ehdr->e_shnum;
+    Elf64_Shdr *new_section = &new_shdr[shnum];
+    new_section->sh_name = shstrtab->sh_size;
+    new_section->sh_type = SHT_PROGBITS;
+    new_section->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+    new_section->sh_addr = injection_vaddr;
+    new_section->sh_offset = injection_offset;
+    new_section->sh_size = payload_size;
+    new_section->sh_addralign = 0x10;
 
-    Elf64_Phdr *new_ph_table = (Elf64_Phdr *)(new_file + new_ph_table_offset);
-    memcpy(new_ph_table, ph_table, ehdr->e_phnum * sizeof(Elf64_Phdr));
+    // Mettre à jour le nombre de sections
+    ehdr = (Elf64_Ehdr *)new_file;
+    ehdr->e_shnum += 1;
+    ehdr->e_entry = injection_vaddr;
 
-    Elf64_Phdr *new_ph = &new_ph_table[ehdr->e_phnum];
-    memset(new_ph, 0, sizeof(Elf64_Phdr));
-    new_ph->p_type = PT_LOAD;
-    new_ph->p_offset = code_offset;
-    new_ph->p_vaddr = new_vaddr;
-    new_ph->p_paddr = new_vaddr;
-    new_ph->p_filesz = new_data_size;
-    new_ph->p_memsz = new_data_size;
-    new_ph->p_flags = PF_R | PF_X;
-    new_ph->p_align = align;
-
-    Elf64_Ehdr *new_ehdr = (Elf64_Ehdr *)new_file;
-    new_ehdr->e_shoff = new_section_table_offset;
-    new_ehdr->e_shnum += 1;
-    new_ehdr->e_phoff = new_ph_table_offset;
-    new_ehdr->e_phnum += 1;
-
-    *func_vaddr = new_sh->sh_addr;
-    *func_offset = new_sh->sh_offset;
-    *func_size = new_sh->sh_size;
+    // Renseigner les infos pour le retour
+    *new_file_size = extended_size;
+    *func_offset = injection_offset;
+    *func_size = payload_size;
+    *func_vaddr = injection_vaddr;
 
     return new_file;
 }
