@@ -10,6 +10,9 @@
 #include <string.h>
 #include <elf.h>
 
+#include <time.h>
+#include <stdbool.h>
+
 typedef struct s_index_struct_elf {
     uint8_t architecture;
     uint8_t program_entry_offset[2];
@@ -60,6 +63,7 @@ int init_struct_elf_program(t_index_struct_elf *elf, t_index_program_header *pro
 // utils.c
 uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t add_value);
 int read_elf_with_header(unsigned char *file);
+char *generate_key(size_t len_key, char *char_accepted);
 
 // function_32bits.c
 unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr);

@@ -1,10 +1,20 @@
 #include "woody_packer.h"
 
 int main(int ac, char **av){
-    if (ac != 2) {
-        write(2, "Wrong number of argument !\n", 27);
+    if (ac != 3 && ac != 4) {
+        printf("Wrong number of argument ! Use:\n");
+        printf("./woody_woodpacker exec_name len_key (char_in_key)");
         return 0;
     }
+
+    char *my_key = "";
+    if (ac == 4)
+        my_key = generate_key(20, av[3]);
+    else
+        my_key = generate_key(20, NULL);
+    if (my_key == NULL) 
+        return 0;
+    printf("Key: %s\n", my_key);
 
     int fd = open(av[1], O_RDWR);
     if (fd == -1){
@@ -170,5 +180,6 @@ int main(int ac, char **av){
     write(fd_test, new_file, new_file_size);
     close(fd_test);
 
+    free(my_key);
     return 0;
 }

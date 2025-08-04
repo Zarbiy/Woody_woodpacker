@@ -69,14 +69,62 @@ int read_elf_with_header(unsigned char *file) {
             Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            // if (!strcmp(name_section, ".dynamic") || !strcmp(name_section, ".text")) {
-            //     unsigned char *str_text = file + section->sh_offset;
-            //     for (int i = 0; i < section->sh_size; i++) {
-            //         printf("%02x ", str_text[i]);
-            //     }
-            //     printf("\n");
-            // }
+            if (!strcmp(name_section, ".text") || !strcmp(name_section, ".test")) {
+                unsigned char *str_text = file + section->sh_offset;
+                for (int i = 0; i < section->sh_size; i++) {
+                    printf("%02x ", str_text[i]);
+                }
+                printf("\n");
+            }
         }
     }
     return 0;
+}
+
+int check_duplicate(char *input) {
+    bool seen[256] = { false };
+
+    for (const char *p = input; *p; ++p) {
+        if (seen[(unsigned char)*p])
+            return -1;
+        else
+            seen[(unsigned char)*p] = true;
+    }
+    return 0;
+}
+
+char *generate_key(size_t len_key, char *char_accepted) {
+    if (len_key < 10) {
+        printf("Key too short. Using default len: 15\n");
+        len_key = 15;
+    }
+
+    if (char_accepted == NULL) {
+        printf("No string given. Using default string\n");
+        char_accepted = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    }
+    else if (check_duplicate(char_accepted) == -1) {
+        char_accepted = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        printf("String given contains duplicate. Using default string\n");
+    }
+
+    size_t len_charset = strlen(char_accepted);
+
+    if (len_charset < 5) {
+        printf("not enough accepted characters\n");
+        return NULL;
+    }
+
+    char *key = malloc(len_key + 1);
+    if (!key) {
+        printf("error malloc");
+        return NULL;
+    }
+
+    srand((unsigned int)time(NULL));
+    for (size_t i = 0; i < len_key; ++i) {
+        key[i] = char_accepted[rand() % len_charset];
+    }
+    key[len_key] = '\0';
+    return key;
 }
