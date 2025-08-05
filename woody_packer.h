@@ -64,11 +64,19 @@ int init_struct_elf_program(t_index_struct_elf *elf, t_index_program_header *pro
 uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t add_value);
 int read_elf_with_header(unsigned char *file);
 char *generate_key(size_t len_key, char *char_accepted);
+char *key_to_hex(const char *key);
+int	ft_atoi(const char *nptr);
 
 // function_32bits.c
 unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr);
 
 // function_64bits.c
-unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr);
+unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr, char *key);
+Elf64_Addr find_main_size_64(unsigned char *file);
+Elf64_Addr find_main_addr_64(unsigned char *file);
+Elf64_Off find_main_offset_64(unsigned char *file);
+
+// crypt.c
+void crypt_main(unsigned char *file, char *key);
 
 #endif

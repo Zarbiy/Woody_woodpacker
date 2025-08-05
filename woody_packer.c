@@ -3,15 +3,15 @@
 int main(int ac, char **av){
     if (ac != 3 && ac != 4) {
         printf("Wrong number of argument ! Use:\n");
-        printf("./woody_woodpacker exec_name len_key (char_in_key)");
+        printf("./woody_woodpacker exec_name len_key(10-20) (char_in_key)");
         return 0;
     }
 
     char *my_key = "";
     if (ac == 4)
-        my_key = generate_key(20, av[3]);
+        my_key = generate_key(ft_atoi(av[2]), av[3]);
     else
-        my_key = generate_key(20, NULL);
+        my_key = generate_key(ft_atoi(av[2]), NULL);
     if (my_key == NULL) 
         return 0;
     printf("Key: %s\n", my_key);
@@ -170,9 +170,11 @@ int main(int ac, char **av){
         Elf64_Off func_offset = 0;
         Elf64_Xword func_size = 0;
         Elf64_Addr func_vaddr = 0;
-        new_file = add_section_64(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr);
+        new_file = add_section_64(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr, my_key);
         // printf("offset:%lx, size:%lx, addr:%lx\n", func_offset, func_size, func_vaddr);
     }
+
+    crypt_main(new_file, my_key);
 
     read_elf_with_header(new_file);
 

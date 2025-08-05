@@ -1,5 +1,60 @@
 #include "woody_packer.h"
 
+Elf64_Off find_main_offset_64(unsigned char *file) {
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
+    Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
+    const char *sh_strtab = (char *)(file + shdr[ehdr->e_shstrndx].sh_offset);
+
+    Elf64_Shdr *symtab = NULL;
+    Elf64_Shdr *strtab = NULL;
+
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        const char *section_name = sh_strtab + shdr[i].sh_name;
+        if (strcmp(section_name, ".symtab") == 0)
+            symtab = &shdr[i];
+        else if (strcmp(section_name, ".strtab") == 0)
+            strtab = &shdr[i];
+    }
+
+    if (!symtab || !strtab) {
+        printf("relevant section not found");
+        return 0;
+    }
+
+    Elf64_Sym *symbols = (Elf64_Sym *)(file + symtab->sh_offset);
+    const char *strtab_data = (char *)(file + strtab->sh_offset);
+    int num_symbols = symtab->sh_size / sizeof(Elf64_Sym);
+
+    Elf64_Addr main_addr = 0;
+    for (int i = 0; i < num_symbols; i++) {
+        const char *name = strtab_data + symbols[i].st_name;
+        if (strcmp(name, "main") == 0) {
+            main_addr = symbols[i].st_value;
+            break;
+        }
+    }
+
+    if (!main_addr) {
+        printf("main not found");
+        return 0;
+    }
+
+    Elf64_Phdr *phdr = (Elf64_Phdr *)(file + ehdr->e_phoff);
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD) {
+            Elf64_Addr start = phdr[i].p_vaddr;
+            Elf64_Addr end = start + phdr[i].p_memsz;
+
+            if (main_addr >= start && main_addr < end) {
+                Elf64_Off offset = phdr[i].p_offset + (main_addr - start);
+                return offset;
+            }
+        }
+    }
+    return 0;
+}
+
+
 Elf64_Addr find_main_addr_64(unsigned char *file) {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
     Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
@@ -74,54 +129,145 @@ Elf64_Addr find_main_size_64(unsigned char *file) {
     return 0;
 }
 
-unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr) {
+void patch_payload_64(unsigned char *payload, uint64_t main_addr, uint64_t main_size, char *key) {
+    // addr main
+    memcpy(&payload[72], &main_addr, 8);
+
+    // size main
+    memcpy(&payload[82], &main_size, 8);
+
+    // size key
+    uint32_t keylen = strlen(key);
+    memcpy(&payload[115], &keylen, 4); 
+
+    // addr main
+    memcpy(&payload[145], &main_addr, 8);
     
+    // key
+    memcpy(&payload[178], key, strlen(key));
+}
+
+unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr, char *key) { 
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
     Elf64_Phdr *phdr = (Elf64_Phdr *)(file + ehdr->e_phoff);
     Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
    
-    Elf64_Addr start_addr = ehdr->e_entry;
+    // Elf64_Addr start_addr = ehdr->e_entry;
     Elf64_Addr main_addr = find_main_addr_64(file);
     Elf64_Xword main_size = find_main_size_64(file);
-    if (main_addr == 0 || main_size == 0) {
-        printf("error addr/size main\n");
+    Elf64_Off main_offset = find_main_offset_64(file);
+    if (main_addr == 0 || main_size == 0 || main_offset == 0) {
+        printf("error addr/size/offset main\n");
         return 0;
     }
-    printf("Start address: 0x%lx| main adress: 0x%lx\n", start_addr, main_addr);
-    printf("main address: 0x%lx| main size: 0x%lx\n", main_addr, main_size);
-
+    // printf("Start address: 0x%lx\n", start_addr);
+    printf("main address: 0x%lx| main size: 0x%lx| main offset 0x%lx\n", main_addr, main_size, main_offset);
 
     unsigned char payload_write_woody[] = {
-        0x48, 0x89, 0xe3,                         // mov rbx, rsp
-        0x48, 0x31, 0xc0,                         // xor rax, rax
-        0x48, 0xc7, 0xc7, 0x01, 0x00, 0x00, 0x00, // mov rdi, 1
-        0x48, 0x8d, 0x35, 0x2d, 0x00, 0x00, 0x00, // lea rsi, [rip + 45]
-        0xba, 0x0e, 0x00, 0x00, 0x00,             // mov edx, 14
-        0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1
-        0x0f, 0x05,                               // syscall
+        // --- Save stack ---
+        0x48, 0x89, 0xe3,                         // mov rbx, rsp                                          ; 3
+        0x48, 0x31, 0xc0,                         // xor rax, rax                                          ; 6
+        // 6
 
-        0x48, 0x89, 0xdc,                         // mov rsp, rbx
+        // --- write(1, "....WOODY....", 14) ---
+        0x48, 0xc7, 0xc7, 0x01, 0x00, 0x00, 0x00, // mov rdi, 1                                            ; 13
+        0x48, 0x8d, 0x35, 0x90, 0x00, 0x00, 0x00, // lea rsi, [rip + 144] ; msg                            ; 20
+        0xba, 0x0e, 0x00, 0x00, 0x00,             // mov edx, 14                                           ; 25
+        0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1 (sys_write)                                ; 30
+        0x0f, 0x05,                               // syscall                                               ; 32
+        // 26
 
-        0xbf, 0x01, 0x00, 0x00, 0x00,             // mov edi, 1        ; argc
-        0x48, 0x89, 0xe6,                         // mov rsi, rsp      ; argv
+        // --- mprotect ---
+        0x48, 0xbf, 0x00, 0x10, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rdi, <page-aligned main_addr>   ; 42
+        0x48, 0xbe, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rsi, 0x1000                     ; 52
+        0x48, 0xba, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rdx, 7                          ; 62
+        0xb8, 0x0a, 0x00, 0x00, 0x00,             // mov eax, 10                                           ; 67
+        0x0f, 0x05,                               //                                                       ; 69
+        // 37
 
-        0x48, 0xb8,                               // mov rax, main
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // addr main a remplacer
+        // --- Decrypt main ---
+        0x48, 0xb8,                               // mov rax, <main_addr>                                  ; 71
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // inject main addr                              ; 79
+        0x48, 0xb9,                               // mov rcx, <main_size>                                  ; 81
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // inject main size                              ; 89
+        0x48, 0x8d, 0x1d, 0x52, 0x00, 0x00, 0x00, // lea rbx, [rip + 82] ; key                             ; 96
+        0x48, 0x31, 0xf6,                         // xor rsi, rsi        ; key index = 0                   ; 99
+        // 30
+
+        // xor_loop:
+        0x8a, 0x14, 0x33,                         // mov dl, [rbx + rsi] ; dl = key[i]                     ; 102
+        0x30, 0x10,                               // xor [rax], dl       ; *rax ^= dl                      ; 105
+        0x48, 0xff, 0xc0,                         // inc rax             ; ++rax                           ; 108
+        0x48, 0xff, 0xc6,                         // inc rsi             ; ++rsi                           ; 111
+        0x48, 0x8b, 0x15, 0x00, 0x00, 0x00, 0x00, // mov rdx, [rip + disp32]  ; inject key size            ; 118
+        0x48, 0x39, 0xf2,                         // cmp rdx, rsi                                          ; 121
+        0x72, 0xf3,                               // jb skip_reset       ; if i < keylen, skip reset       ; 123
+        0x48, 0x31, 0xf6,                         // xor rsi, rsi        ; reset i = 0                     ; 126
+        // skip_reset:
+        0x48, 0xff, 0xc9,                         // dec rcx                                               ; 129
+        0x75, 0xea,                               // jne xor_loop                                          ; 131
+        // 31
+
+        // --- Restore stack ---
+        0x48, 0x89, 0xdc,                         // mov rsp, rbx                                          ; 134
+        // 3
+
+        // --- Setup main(argc=1, argv=rsp) ---
+        0xbf, 0x01, 0x00, 0x00, 0x00,             // mov edi, 1                                            ; 149
+        0x48, 0x89, 0xe6,                         // mov rsi, rsp                                          ; 142
+        // 8
+
+        // --- call main ---
+        0x48, 0xb8,                               // mov rax, <main_addr>                                  ; 144
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // inject main addr                               ; 152
         0xff, 0xd0,                               // call rax
+        // 12
 
-        0x48, 0x31, 0xff,                         // xor edi, edi
-        0xb8, 0x3c, 0x00, 0x00, 0x00,             // mov eax, 60       ; exit
-        0x0f, 0x05,                               // syscall
+        // --- exit(0) ---
+        0x48, 0x31, 0xff,                         // xor edi, edi                                          ; 155
+        0xb8, 0x3c, 0x00, 0x00, 0x00,             // mov eax, 60                                           ; 160
+        0x0f, 0x05,                               // syscall                                               ; 162
+        // 10
 
-        '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0'
+        '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0',               //      ; 177
+        // 15
+
+        0x00 // inject key
     };
 
-    size_t addr_offset = 45;
-    memcpy(&payload_write_woody[addr_offset], &main_addr, sizeof(main_addr));
+    patch_payload_64(payload_write_woody, main_addr, main_size, key);
+
+    // unsigned char payload_write_woody[] = {
+    //     0x48, 0x89, 0xe3,                         // mov rbx, rsp
+    //     0x48, 0x31, 0xc0,                         // xor rax, rax
+    //     0x48, 0xc7, 0xc7, 0x01, 0x00, 0x00, 0x00, // mov rdi, 1
+    //     0x48, 0x8d, 0x35, 0x2d, 0x00, 0x00, 0x00, // lea rsi, [rip + 45]
+    //     0xba, 0x0e, 0x00, 0x00, 0x00,             // mov edx, 14
+    //     0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1
+    //     0x0f, 0x05,                               // syscall
+
+    //     0x48, 0x89, 0xdc,                         // mov rsp, rbx
+
+    //     0xbf, 0x01, 0x00, 0x00, 0x00,             // mov edi, 1        ; argc
+    //     0x48, 0x89, 0xe6,                         // mov rsi, rsp      ; argv
+
+    //     0x48, 0xb8,                               // mov rax, main
+    //     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // addr main a remplacer
+    //     0xff, 0xd0,                               // call rax
+
+    //     0x48, 0x31, 0xff,                         // xor edi, edi
+    //     0xb8, 0x3c, 0x00, 0x00, 0x00,             // mov eax, 60       ; exit
+    //     0x0f, 0x05,                               // syscall
+
+    //     '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0'
+    // };
+
+    // size_t addr_offset = 45;
+    // memcpy(&payload_write_woody[addr_offset], &main_addr, sizeof(main_addr));
 
     const char new_section_name[] = ".test";
 
-    size_t payload_size = sizeof(payload_write_woody) - 1;
+    size_t payload_size = sizeof(payload_write_woody) - 1 + strlen(key);
     size_t new_section_name_len = strlen(new_section_name) + 1;
 
     // printf("Payload size: %ld %lx\n", payload_size, payload_size);

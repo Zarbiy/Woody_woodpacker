@@ -57,7 +57,7 @@ int read_elf_with_header(unsigned char *file) {
             Elf32_Shdr *section = &((Elf32_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8x | %4x | %4u(dec) %6x(hex) | %i\n", i, name_section, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            if (!strcmp(name_section, ".dynamic") || !strcmp(name_section, ".text")) {
+            if (!strcmp(name_section, ".text")) {
                 unsigned char *str_text = file + section->sh_offset;
                 for (int i = 0; i < section->sh_size; i++) {
                     printf("%02x ", str_text[i]);
@@ -94,9 +94,9 @@ int check_duplicate(char *input) {
 }
 
 char *generate_key(size_t len_key, char *char_accepted) {
-    if (len_key < 10) {
-        printf("Key too short. Using default len: 15\n");
-        len_key = 15;
+    if (len_key < 10 || len_key > 20) {
+        printf("Key too short or to long (10-20). Using default len: 20\n");
+        len_key = 20;
     }
 
     if (char_accepted == NULL) {
@@ -110,7 +110,7 @@ char *generate_key(size_t len_key, char *char_accepted) {
 
     size_t len_charset = strlen(char_accepted);
 
-    if (len_charset < 5) {
+    if (len_charset < 10) {
         printf("not enough accepted characters\n");
         return NULL;
     }
@@ -127,4 +127,44 @@ char *generate_key(size_t len_key, char *char_accepted) {
     }
     key[len_key] = '\0';
     return key;
+}
+
+char *key_to_hex(const char *key) {
+    size_t len = strlen(key);
+    char *hex = malloc(len * 2 + 1);
+    if (!hex) return NULL;
+
+    for (size_t i = 0; i < len; i++) {
+        sprintf(hex + i*2, "%02x", (unsigned char)key[i]);
+    }
+    hex[len * 2] = '\0';
+    return hex;
+}
+
+int	ft_atoi(const char *nptr)
+{
+	unsigned int	i;
+	unsigned int	compteur;
+	int				signe;
+	int				valeur;
+
+	compteur = 0;
+	valeur = 0;
+	i = 0;
+	signe = 1;
+	while (nptr[i] && (nptr[i] == ' ' || nptr[i] == '\f' || nptr[i] == '\n'
+			|| nptr[i] == '\r' || nptr[i] == '\t' || nptr[i] == '\v'))
+		i++;
+	if (nptr[i] == '-' || nptr[i] == '+')
+	{
+		if (nptr[i] == '-')
+			signe = -1;
+		i++;
+	}
+	while (nptr[i] && nptr[i] >= '0' && nptr[i] <= '9')
+	{
+		valeur = valeur * 10 + (nptr[i] - '0');
+		i++;
+	}
+	return (signe * valeur);
 }
