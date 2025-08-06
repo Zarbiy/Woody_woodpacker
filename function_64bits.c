@@ -130,21 +130,29 @@ Elf64_Addr find_main_size_64(unsigned char *file) {
 }
 
 void patch_payload_64(unsigned char *payload, uint64_t main_addr, uint64_t main_size, char *key) {
+    uint64_t page_size = 0x1000;
+    uint64_t aligned_addr = main_addr & ~(page_size - 1);
+    uint64_t offset = main_addr - aligned_addr;
+    uint64_t mprotect_size = ((main_size + offset + page_size - 1) & ~(page_size - 1));
+
+    // a voir si il faut injecter ca !!!
+    printf("aligned_addr %lx| mprotect_size %lx\n", aligned_addr, mprotect_size);
+
     // addr main
-    memcpy(&payload[72], &main_addr, 8);
+    memcpy(&payload[71], &main_addr, 8);
 
     // size main
-    memcpy(&payload[82], &main_size, 8);
-
-    // size key
-    uint32_t keylen = strlen(key);
-    memcpy(&payload[115], &keylen, 4); 
+    memcpy(&payload[81], &main_size, 8);
 
     // addr main
-    memcpy(&payload[145], &main_addr, 8);
+    memcpy(&payload[149], &main_addr, 8);
+    
+    // size key
+    uint64_t keylen = strlen(key);
+    memcpy(&payload[184], &keylen, 8); 
     
     // key
-    memcpy(&payload[178], key, strlen(key));
+    memcpy(&payload[192], key, strlen(key));
 }
 
 unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr, char *key) { 
@@ -165,74 +173,78 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
 
     unsigned char payload_write_woody[] = {
         // --- Save stack ---
-        0x48, 0x89, 0xe3,                         // mov rbx, rsp                                          ; 3
-        0x48, 0x31, 0xc0,                         // xor rax, rax                                          ; 6
-        // 6
+        0x48, 0x89, 0xe3,                         // mov rbx, rsp
+        0x48, 0x31, 0xc0,                         // xor rax, rax
+        // 6 -- 6
 
         // --- write(1, "....WOODY....", 14) ---
-        0x48, 0xc7, 0xc7, 0x01, 0x00, 0x00, 0x00, // mov rdi, 1                                            ; 13
-        0x48, 0x8d, 0x35, 0x90, 0x00, 0x00, 0x00, // lea rsi, [rip + 144] ; msg                            ; 20
-        0xba, 0x0e, 0x00, 0x00, 0x00,             // mov edx, 14                                           ; 25
-        0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1 (sys_write)                                ; 30
-        0x0f, 0x05,                               // syscall                                               ; 32
-        // 26
+        0x48, 0xc7, 0xc7, 0x01, 0x00, 0x00, 0x00, // mov rdi, 1
+        0x48, 0x8d, 0x35, 0x95, 0x00, 0x00, 0x00, // lea rsi, [rip + 149]
+        0xba, 0x0e, 0x00, 0x00, 0x00,             // mov edx, 14
+        0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1
+        0x0f, 0x05,                               // syscall
+        // 26 -- 32
 
         // --- mprotect ---
-        0x48, 0xbf, 0x00, 0x10, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rdi, <page-aligned main_addr>   ; 42
-        0x48, 0xbe, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rsi, 0x1000                     ; 52
-        0x48, 0xba, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rdx, 7                          ; 62
-        0xb8, 0x0a, 0x00, 0x00, 0x00,             // mov eax, 10                                           ; 67
-        0x0f, 0x05,                               //                                                       ; 69
-        // 37
+        0x48, 0xbf, 0x00, 0x10, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rdi, <main_page>
+        0x48, 0xbe, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rsi, 0x1000
+        0x48, 0xba, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rdx, 7
+        0xb8, 0x0a, 0x00, 0x00, 0x00,             // mov eax, 10
+        0x0f, 0x05,                               // syscall
+        // 37 -- 69
 
         // --- Decrypt main ---
-        0x48, 0xb8,                               // mov rax, <main_addr>                                  ; 71
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // inject main addr                              ; 79
-        0x48, 0xb9,                               // mov rcx, <main_size>                                  ; 81
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,   // inject main size                              ; 89
-        0x48, 0x8d, 0x1d, 0x52, 0x00, 0x00, 0x00, // lea rbx, [rip + 82] ; key                             ; 96
-        0x48, 0x31, 0xf6,                         // xor rsi, rsi        ; key index = 0                   ; 99
-        // 30
+        0x49, 0xbb,                               // mov r11, <main_addr>
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     // inject main addr
+        0x48, 0xb9,                               // mov rcx, <main_size>
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     // inject main size 
+        0x48, 0x8d, 0x1d, 0x60, 0x00, 0x00, 0x00, // lea rbx, [rip + 96]
+        0x48, 0x31, 0xf6,                         // xor rsi, rsi        ; i = 0
+        0x48, 0x31, 0xd2,                         // xor rdx, rdx        ; j = 0
+        // 33 -- 102
 
         // xor_loop:
-        0x8a, 0x14, 0x33,                         // mov dl, [rbx + rsi] ; dl = key[i]                     ; 102
-        0x30, 0x10,                               // xor [rax], dl       ; *rax ^= dl                      ; 105
-        0x48, 0xff, 0xc0,                         // inc rax             ; ++rax                           ; 108
-        0x48, 0xff, 0xc6,                         // inc rsi             ; ++rsi                           ; 111
-        0x48, 0x8b, 0x15, 0x00, 0x00, 0x00, 0x00, // mov rdx, [rip + disp32]  ; inject key size            ; 118
-        0x48, 0x39, 0xf2,                         // cmp rdx, rsi                                          ; 121
-        0x72, 0xf3,                               // jb skip_reset       ; if i < keylen, skip reset       ; 123
-        0x48, 0x31, 0xf6,                         // xor rsi, rsi        ; reset i = 0                     ; 126
-        // skip_reset:
-        0x48, 0xff, 0xc9,                         // dec rcx                                               ; 129
-        0x75, 0xea,                               // jne xor_loop                                          ; 131
-        // 31
+        0x4d, 0x31, 0xC9,                           // xor r9, r9
+        0x44, 0x8a, 0x0c, 0x13,                     // mov r9b, [rbx + rdx]
+        0x45, 0x30, 0x0c, 0x33,                     // xor [r11 + rsi], r9b
+        0x48, 0xff, 0xc6,                           // inc rsi             ; ++i
+        0x48, 0xff, 0xc2,                           // inc rdx             ; ++j
+        // 17 -- 119
 
-        // --- Restore stack ---
-        0x48, 0x89, 0xdc,                         // mov rsp, rbx                                          ; 134
-        // 3
+        0x4c, 0x8b, 0x05, 0x3a, 0x00, 0x00, 0x00, // mov r8, [rip + 58] ; r8 = key_len
+        0x4c, 0x39, 0xc2,                         // cmp rdx, r8        ; j < key_len ?
+        0x72, 0x03,                               // jb skip_reset
+        0x48, 0x31, 0xd2,                         // xor rdx, rdx        ; j = 0
+        // skip_reset:
+        0x48, 0xff, 0xc9,                         // dec rcx
+        0x75, 0xdb,                               // jne xor_loop
+        // 20 -- 139
+
 
         // --- Setup main(argc=1, argv=rsp) ---
-        0xbf, 0x01, 0x00, 0x00, 0x00,             // mov edi, 1                                            ; 149
-        0x48, 0x89, 0xe6,                         // mov rsi, rsp                                          ; 142
-        // 8
+        0xbf, 0x01, 0x00, 0x00, 0x00,             // mov edi, 1
+        0x48, 0x89, 0xe6,                         // mov rsi, rsp
+        // 8 -- 147
 
         // --- call main ---
-        0x48, 0xb8,                               // mov rax, <main_addr>                                  ; 144
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // inject main addr                               ; 152
+        0x48, 0xb8,                               // mov rax, <main_addr>
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     // inject main addr
         0xff, 0xd0,                               // call rax
-        // 12
+        // 12 -- 159
 
         // --- exit(0) ---
-        0x48, 0x31, 0xff,                         // xor edi, edi                                          ; 155
-        0xb8, 0x3c, 0x00, 0x00, 0x00,             // mov eax, 60                                           ; 160
-        0x0f, 0x05,                               // syscall                                               ; 162
-        // 10
+        0x48, 0x31, 0xff,                         // xor edi, edi
+        0xb8, 0x3c, 0x00, 0x00, 0x00,             // mov eax, 60
+        0x0f, 0x05,                               // syscall
+        // 10 -- 169
 
-        '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0',               //      ; 177
-        // 15
+        '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0',
+        // 15 -- 184
 
-        0x00 // inject key
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // inject key size
+        // 8 -- 191
+
+        0x00    // inject key
     };
 
     patch_payload_64(payload_write_woody, main_addr, main_size, key);

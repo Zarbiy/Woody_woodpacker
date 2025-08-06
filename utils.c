@@ -101,10 +101,10 @@ char *generate_key(size_t len_key, char *char_accepted) {
 
     if (char_accepted == NULL) {
         printf("No string given. Using default string\n");
-        char_accepted = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     }
     else if (check_duplicate(char_accepted) == -1) {
-        char_accepted = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         printf("String given contains duplicate. Using default string\n");
     }
 
