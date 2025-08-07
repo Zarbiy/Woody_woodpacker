@@ -152,6 +152,7 @@ void patch_payload_64(unsigned char *payload, uint64_t main_addr, uint64_t main_
     memcpy(&payload[184], &keylen, 8); 
     
     // key
+    // key = "123456789";
     memcpy(&payload[192], key, strlen(key));
 }
 

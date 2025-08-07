@@ -163,8 +163,9 @@ int main(int ac, char **av){
         Elf32_Off func_offset = 0;
         Elf32_Xword func_size = 0;
         Elf32_Addr func_vaddr = 0;
-        new_file = add_section_32(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr);
+        new_file = add_section_32(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr, my_key);
         // printf("offset:%x, size:%lx, addr:%x\n", func_offset, func_size, func_vaddr);
+        crypt_main_32(new_file, my_key);
     }
     else if (elf.architecture == 2) {
         Elf64_Off func_offset = 0;
@@ -172,9 +173,13 @@ int main(int ac, char **av){
         Elf64_Addr func_vaddr = 0;
         new_file = add_section_64(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr, my_key);
         // printf("offset:%lx, size:%lx, addr:%lx\n", func_offset, func_size, func_vaddr);
+        crypt_main_64(new_file, my_key);
     }
-
-    crypt_main(new_file, my_key);
+    else {
+        printf("Architecture not found or not valid\n");
+        return 0;
+    }
+    
 
     read_elf_with_header(new_file);
 

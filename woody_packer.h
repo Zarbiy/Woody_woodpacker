@@ -68,7 +68,10 @@ char *key_to_hex(const char *key);
 int	ft_atoi(const char *nptr);
 
 // function_32bits.c
-unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr);
+unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key);
+Elf32_Addr find_main_size_32(unsigned char *file);
+Elf32_Addr find_main_addr_32(unsigned char *file);
+Elf32_Off find_main_offset_32(unsigned char *file);
 
 // function_64bits.c
 unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr, char *key);
@@ -77,6 +80,7 @@ Elf64_Addr find_main_addr_64(unsigned char *file);
 Elf64_Off find_main_offset_64(unsigned char *file);
 
 // crypt.c
-void crypt_main(unsigned char *file, char *key);
+void crypt_main_64(unsigned char *file, char *key);
+void crypt_main_32(unsigned char *file, char *key);
 
 #endif

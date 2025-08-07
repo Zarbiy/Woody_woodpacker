@@ -57,7 +57,7 @@ int read_elf_with_header(unsigned char *file) {
             Elf32_Shdr *section = &((Elf32_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8x | %4x | %4u(dec) %6x(hex) | %i\n", i, name_section, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            if (!strcmp(name_section, ".text")) {
+            if (!strcmp(name_section, ".text") || !strcmp(name_section, ".test")) {
                 unsigned char *str_text = file + section->sh_offset;
                 for (int i = 0; i < section->sh_size; i++) {
                     printf("%02x ", str_text[i]);
@@ -94,17 +94,17 @@ int check_duplicate(char *input) {
 }
 
 char *generate_key(size_t len_key, char *char_accepted) {
-    if (len_key < 10 || len_key > 20) {
-        printf("Key too short or to long (10-20). Using default len: 20\n");
-        len_key = 20;
+    if (len_key < 20 || len_key > 40) {
+        printf("Key too short or to long (20-40). Using default len: 30\n");
+        len_key = 30;
     }
 
     if (char_accepted == NULL) {
         printf("No string given. Using default string\n");
-        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz";
     }
     else if (check_duplicate(char_accepted) == -1) {
-        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz";
         printf("String given contains duplicate. Using default string\n");
     }
 
