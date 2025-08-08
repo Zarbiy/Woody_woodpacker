@@ -187,6 +187,7 @@ int main(int ac, char **av){
     write(fd_test, new_file, new_file_size);
     close(fd_test);
 
+    free(new_file);
     free(my_key);
     return 0;
 }

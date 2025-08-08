@@ -138,9 +138,9 @@ void patch_payload_32(unsigned char *payload, uint32_t main_addr, uint32_t main_
 
     printf("aligned_addr: 0x%x | mprotect_size: 0x%x | keylen: %u\n", aligned_addr, mprotect_size, keylen);
 
-    uint32_t msg_addr_woody = payload_vaddr + 163;
-    uint32_t msg_addr_key = payload_vaddr + 178;
-    uint32_t key_addr = payload_vaddr + 190;
+    uint32_t msg_addr_woody = payload_vaddr + 165;
+    uint32_t msg_addr_key = payload_vaddr + 180;
+    uint32_t key_addr = payload_vaddr + 192;
 
     memcpy(&payload[11], &msg_addr_woody, 4);
 
@@ -156,7 +156,7 @@ void patch_payload_32(unsigned char *payload, uint32_t main_addr, uint32_t main_
 
     memcpy(&payload[112], &key_addr, 4);
 
-    memcpy(&payload[148], &main_addr, 4);
+    memcpy(&payload[150], &main_addr, 4);
 }
 
 unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key) { 
@@ -209,6 +209,7 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
         0x89, 0xc7,                               // mov edi, eax
         // 24 -- 90
 
+        // --- check \n end key
         0x31, 0xc0,                               // xor eax, eax
         0x4F,                                     // dec edi
         0x8A, 0x04, 0x39,                         // mov al, [ecx + edi]
@@ -240,31 +241,31 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
         // 20 -- 140
 
         // --- push args and call main ---
-        0x6a, 0x01,                               // push 1
-        0x89, 0xe1,                               // mov ecx, esp (argv)
-        0x51,                                     // push ecx
-        0x89, 0xe1,                               // mov ecx, esp
+        0x8b, 0x04, 0x24,                         // mov eax, [esp]
+        0x8d, 0x5c, 0x24, 0x04,                   // lea ebx, [esp+4]
+        0x53,                                     // push ebx
+        0x50,                                     // push eax
         0xb8, 0x00, 0x00, 0x00, 0x00,             // mov eax, <main_addr>
         0xff, 0xd0,                               // call eax
-        // 14 -- 154
+        // 16 -- 156
 
         // --- exit(0) ---
         0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1
         0x31, 0xdb,                               // xor ebx, ebx
         0xcd, 0x80,                               // int 0x80
-        // 9 -- 163
+        // 9 -- 165
 
         '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0',
-        // 15 -- 178
+        // 15 -- 180
 
         'E', 'n', 't', 'e', 'r', ' ', 'k', 'e', 'y', ':', ' ', '\0',
-        // 12 -- 190
+        // 12 -- 192
 
         // --- key data ---
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     };
 
     const char new_section_name[] = ".test";

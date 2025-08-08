@@ -19,14 +19,5 @@ int main(int ac, char **argv){
     printf("%s\n", buf);
     printf("%d\n", n);
 
-
-    if (ac >= 2){
-        printf("%s\n", argv[1]);
-    }
     return 0;
-}
-
-
-if (key[-1] == '\n'){
-    len_key --;
 }

@@ -94,8 +94,8 @@ int check_duplicate(char *input) {
 }
 
 char *generate_key(size_t len_key, char *char_accepted) {
-    if (len_key < 20 || len_key > 40) {
-        printf("Key too short or to long (20-40). Using default len: 30\n");
+    if (len_key < 20 || len_key > 39) {
+        printf("Key too short or to long (20-39). Using default len: 30\n");
         len_key = 30;
     }
 
