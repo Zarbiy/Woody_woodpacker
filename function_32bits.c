@@ -138,23 +138,25 @@ void patch_payload_32(unsigned char *payload, uint32_t main_addr, uint32_t main_
 
     printf("aligned_addr: 0x%x | mprotect_size: 0x%x | keylen: %u\n", aligned_addr, mprotect_size, keylen);
 
-    uint32_t msg_addr = payload_vaddr + 111;
-    memcpy(&payload[11], &msg_addr, 4);
+    uint32_t msg_addr_woody = payload_vaddr + 163;
+    uint32_t msg_addr_key = payload_vaddr + 178;
+    uint32_t key_addr = payload_vaddr + 190;
+
+    memcpy(&payload[11], &msg_addr_woody, 4);
 
     memcpy(&payload[28], &aligned_addr, 4);
 
-    memcpy(&payload[45], &main_addr, 4);
-    memcpy(&payload[50], &main_size, 4);
+    memcpy(&payload[55], &msg_addr_key, 4);
 
-    uint32_t key_addr = payload_vaddr + 130;
-    memcpy(&payload[55], &key_addr, 4);
+    memcpy(&payload[77], &key_addr, 4);
 
-    memcpy(&payload[60], &keylen, 4);
-    memcpy(&payload[126], &keylen, 4);
+    memcpy(&payload[102], &main_addr, 4);
 
-    memcpy(&payload[96], &main_addr, 4);
+    memcpy(&payload[107], &main_size, 4);
 
-    memcpy(&payload[130], key, keylen);
+    memcpy(&payload[112], &key_addr, 4);
+
+    memcpy(&payload[148], &main_addr, 4);
 }
 
 unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key) { 
@@ -190,15 +192,39 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
         0xcd, 0x80,                               // int 0x80
         // 22 -- 44
 
+        // --- write(1, "Enter key: ", 11) ---
+        0xb8, 0x04, 0x00, 0x00, 0x00,             // mov eax, 4 (sys_write)
+        0xbb, 0x01, 0x00, 0x00, 0x00,             // mov ebx, 1 (stdout)
+        0xb9, 0x00, 0x00, 0x00, 0x00,             // mov ecx, <address msg>
+        0xba, 0x0b, 0x00, 0x00, 0x00,             // mov edx, 11
+        0xcd, 0x80,                               // int 0x80
+        // 22 -- 66
+
+        // --- read(0, key, key_len)
+        0xb8, 0x03, 0x00, 0x00, 0x00,             // mov eax, 3 (sys_read)
+        0xbb, 0x00, 0x00, 0x00, 0x00,             // mov ebx, 0 (stdin)
+        0xb9, 0x00, 0x00, 0x00, 0x00,             // mov ecx, <key_addr>
+        0xba, 0x28, 0x00, 0x00, 0x00,             // mov edx, 40
+        0xcd, 0x80,                               // int 0x80
+        0x89, 0xc7,                               // mov edi, eax
+        // 24 -- 90
+
+        0x31, 0xc0,                               // xor eax, eax
+        0x4F,                                     // dec edi
+        0x8A, 0x04, 0x39,                         // mov al, [ecx + edi]
+        0x3C, 0x0A,                               // cmp al, 0x0a
+        0x74, 0x01,                               // je +1
+        0x47,                                     // inc edi
+        // 11 -- 101
+
         // --- XOR decrypt loop ---
         0xbe, 0x00, 0x00, 0x00, 0x00,             // mov esi, <main_addr>
         0xb9, 0x00, 0x00, 0x00, 0x00,             // mov ecx, <main_size>
         0xba, 0x00, 0x00, 0x00, 0x00,             // mov edx, <key_addr>
-        0xbf, 0x00, 0x00, 0x00, 0x00,             // mov edi, <key_len>
         0x31, 0xed,                               // xor ebp, ebp
         0x31, 0xdb,                               // xor ebx, ebx              ; i = 0
-        // 24 -- 68
-        
+        // 19 -- 120
+
         // loop:
         0x31, 0xc0,                               // xor eax, eax
         0x8a, 0x04, 0x1a,                         // mov al, [edx + ebx]
@@ -211,7 +237,7 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
         // skip_reset:
         0x39, 0xcd,                               // cmp ebp, ecx              ; i < main_size ?
         0x7c, 0xec,                               // jl loop
-        // 20 -- 88
+        // 20 -- 140
 
         // --- push args and call main ---
         0x6a, 0x01,                               // push 1
@@ -220,28 +246,30 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
         0x89, 0xe1,                               // mov ecx, esp
         0xb8, 0x00, 0x00, 0x00, 0x00,             // mov eax, <main_addr>
         0xff, 0xd0,                               // call eax
-        // 14 -- 102
+        // 14 -- 154
 
         // --- exit(0) ---
         0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1
         0x31, 0xdb,                               // xor ebx, ebx
         0xcd, 0x80,                               // int 0x80
-        // 9 -- 111
+        // 9 -- 163
 
         '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0',
-        // 15 -- 126
+        // 15 -- 178
 
-        // --- key_len ---
-        0x00, 0x00, 0x00, 0x00,
-        // 4 -- 130
+        'E', 'n', 't', 'e', 'r', ' ', 'k', 'e', 'y', ':', ' ', '\0',
+        // 12 -- 190
 
         // --- key data ---
-        0x00
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     };
 
     const char new_section_name[] = ".test";
 
-    size_t payload_size = sizeof(payload_write_woody) - 1 + strlen(key);
+    size_t payload_size = sizeof(payload_write_woody) - 1;
     size_t new_section_name_len = strlen(new_section_name) + 1;
 
     printf("Payload size: %ld %lx\n", payload_size, payload_size);
