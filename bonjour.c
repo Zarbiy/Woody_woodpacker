@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int main(int ac, char **argv){
+int main(int ac, char **argv, char **env){
     write(1, "Bonjour je suis bob\n", 20);
     printf("%d\n", ac);
     for(int i = 0; i < 100; i++) {
@@ -18,6 +18,16 @@ int main(int ac, char **argv){
 
     printf("%s\n", buf);
     printf("%d\n", n);
+
+    printf("%s\n", argv[2]);
+    printf("%s\n", env[0]);
+
+    int b = 0;
+    while (1){
+        if (b == 100)
+            break;
+        b += 1;
+    }
 
     return 0;
 }

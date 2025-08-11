@@ -10,7 +10,6 @@
 #include <string.h>
 #include <elf.h>
 
-#include <time.h>
 #include <stdbool.h>
 
 typedef struct s_index_struct_elf {
@@ -64,17 +63,21 @@ int init_struct_elf_program(t_index_struct_elf *elf, t_index_program_header *pro
 uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t add_value);
 int read_elf_with_header(unsigned char *file);
 char *generate_key(size_t len_key, char *char_accepted);
-char *key_to_hex(const char *key);
+int calc_size_key(unsigned char *file, int archi);
 int	ft_atoi(const char *nptr);
+int	ft_strncmp(const char *s1, const char *s2, size_t n);
+int ft_strcmp(const char *s1, const char *s2);
 
 // function_32bits.c
-unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key);
+unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key);
+long space_between_fini_rodata_32(unsigned char *file);
 Elf32_Addr find_main_size_32(unsigned char *file);
 Elf32_Addr find_main_addr_32(unsigned char *file);
 Elf32_Off find_main_offset_32(unsigned char *file);
 
 // function_64bits.c
-unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr, char *key);
+unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr);
+long space_between_fini_rodata_64(unsigned char *file);
 Elf64_Addr find_main_size_64(unsigned char *file);
 Elf64_Addr find_main_addr_64(unsigned char *file);
 Elf64_Off find_main_offset_64(unsigned char *file);

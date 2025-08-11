@@ -1,20 +1,11 @@
 #include "woody_packer.h"
 
 int main(int ac, char **av){
-    if (ac != 3 && ac != 4) {
+    if (ac < 2 || ac > 3) {
         printf("Wrong number of argument ! Use:\n");
-        printf("./woody_woodpacker exec_name len_key(10-20) (char_in_key)");
+        printf("./woody_woodpacker exec_name (char_in_key)");
         return 0;
     }
-
-    char *my_key = "";
-    if (ac == 4)
-        my_key = generate_key(ft_atoi(av[2]), av[3]);
-    else
-        my_key = generate_key(ft_atoi(av[2]), NULL);
-    if (my_key == NULL) 
-        return 0;
-    printf("Key: %s\n", my_key);
 
     int fd = open(av[1], O_RDWR);
     if (fd == -1){
@@ -66,7 +57,7 @@ int main(int ac, char **av){
 
     value_efl.section_name_entry_offset = value_efl.offset_section_table + ((uint64_t)value_efl.index_section_name_section * value_efl.size_section);
     value_efl.section_name_start = extract_bytes(file, program.offset[0], program.offset[1], value_efl.section_name_entry_offset);
-    char *all_section_name = (char *)(file + value_efl.section_name_start);
+    // char *all_section_name = (char *)(file + value_efl.section_name_start);
 
     // uint64_t text_addr = 0;
     // uint64_t text_offset = 0;
@@ -85,7 +76,7 @@ int main(int ac, char **av){
 
     //     printf("%2d | %8lx | %4lx | %4lu | %10lu | %s\n", i, addr, offset, size, sh_name, name_section);
 
-    //     if (!strcmp(name_section, ".rodata")) {
+    //     if (!ft_strcmp(name_section, ".rodata")) {
     //         text_addr = addr;
     //         text_offset = offset;
     //         unsigned char *str_text = file + offset;
@@ -96,7 +87,7 @@ int main(int ac, char **av){
     //         printf("\n");
     //     }
 
-    //     if (!strcmp(name_section, ".text")) {
+    //     if (!ft_strcmp(name_section, ".text")) {
     //         text_addr = addr;
     //         text_offset = offset;
     //         unsigned char *str_text = file + offset;
@@ -108,7 +99,7 @@ int main(int ac, char **av){
     //     }
 
     //     // on a trouve symtab maintenant il faur aller lire strtab pour trouve ou sont le _start/ main
-    //     if (!strcmp(name_section, ".symtab")) { 
+    //     if (!ft_strcmp(name_section, ".symtab")) { 
     //         uint64_t symtab_offset = offset;
     //         uint64_t symtab_size = size;
 
@@ -120,7 +111,7 @@ int main(int ac, char **av){
     //             size_t s_off = value_efl.offset_section_table + (j * value_efl.size_section);
     //             uint64_t sh_name_tmp = extract_bytes(file, program.sh_name[0], program.sh_name[1], s_off);
     //             char *name_tmp = all_section_name + sh_name_tmp;
-    //             if (!strcmp(name_tmp, ".strtab")) {
+    //             if (!ft_strcmp(name_tmp, ".strtab")) {
     //                 strtab_offset = extract_bytes(file, program.offset[0], program.offset[1], s_off);
     //                 break;
     //             }
@@ -139,7 +130,7 @@ int main(int ac, char **av){
     //             const char *sym_name = (char *)(file + strtab_offset + st_name);
 
     //             // printf("name: %40s, addr: %8lx, size: %5lu\n", sym_name, st_value, st_size);
-    //             if (!strcmp(sym_name, "_start") || !strcmp(sym_name, "main")) {
+    //             if (!ft_strcmp(sym_name, "_start") || !ft_strcmp(sym_name, "main")) {
     //                 printf("%8s addr: %lx Size %lu\n", sym_name, st_value, st_size);
     //                 unsigned char *start_code = file + (st_value - text_addr + text_offset);
     //                 for (size_t i = 0; i < st_size; i++) {
@@ -156,23 +147,41 @@ int main(int ac, char **av){
     //     }
     // }
 
+    int archi = file[4];
+    int size_key = calc_size_key(file, archi);
+    if (size_key == 0)
+        return 0;
+    char *my_key = "";
+    if (ac == 3)
+        my_key = generate_key(size_key, av[2]);
+    else
+        my_key = generate_key(size_key, NULL);
+    if (my_key == NULL) 
+        return 0;
+
     unsigned char *new_file;
     unsigned long new_file_size = 0;
-    
-    if (elf.architecture == 1) {
+
+    if (archi == 1) {
         Elf32_Off func_offset = 0;
         Elf32_Xword func_size = 0;
         Elf32_Addr func_vaddr = 0;
-        new_file = add_section_32(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr, my_key);
-        // printf("offset:%x, size:%lx, addr:%x\n", func_offset, func_size, func_vaddr);
+        new_file = add_section_32(file, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr, my_key);
+        if (new_file == NULL) {
+            free(my_key);
+            return 0;
+        }
         crypt_main_32(new_file, my_key);
     }
-    else if (elf.architecture == 2) {
+    else if (archi == 2) {
         Elf64_Off func_offset = 0;
         Elf64_Xword func_size = 0;
         Elf64_Addr func_vaddr = 0;
-        new_file = add_section_64(file, &value_efl, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr, my_key);
-        // printf("offset:%lx, size:%lx, addr:%lx\n", func_offset, func_size, func_vaddr);
+        new_file = add_section_64(file, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr);
+        if (new_file == NULL) {
+            free(my_key);
+            return 0;
+        }
         crypt_main_64(new_file, my_key);
     }
     else {
@@ -180,13 +189,13 @@ int main(int ac, char **av){
         return 0;
     }
     
-
     read_elf_with_header(new_file);
 
     int fd_test = open("woody_test", O_CREAT | O_WRONLY | O_TRUNC, 0777);
     write(fd_test, new_file, new_file_size);
     close(fd_test);
 
+    printf("\n\nKey: %s\n", my_key);
     free(new_file);
     free(my_key);
     return 0;

@@ -1,5 +1,32 @@
 #include "woody_packer.h"
 
+long space_between_fini_rodata_64(unsigned char *file) {
+    Elf64_Ehdr *eh = (Elf64_Ehdr *)file;
+
+    Elf64_Shdr *sections = (Elf64_Shdr *)(file + eh->e_shoff);
+    Elf64_Shdr *sh_strtab = &sections[eh->e_shstrndx];
+    const char *strtab = (const char *)(file + sh_strtab->sh_offset);
+
+    Elf64_Addr fini_end = 0, rodata_start = 0;
+
+    for (int i = 0; i < eh->e_shnum; i++) {
+        const char *name = strtab + sections[i].sh_name;
+        if (strcmp(name, ".fini") == 0) {
+            fini_end = sections[i].sh_addr + sections[i].sh_size;
+        }
+        else if (strcmp(name, ".rodata") == 0) {
+            rodata_start = sections[i].sh_addr;
+        }
+    }
+
+    if (!fini_end || !rodata_start) {
+        fprintf(stderr, "Sections .fini ou .rodata introuvables\n");
+        return -1;
+    }
+
+    return (long)(rodata_start - fini_end);
+}
+
 Elf64_Off find_main_offset_64(unsigned char *file) {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
     Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
@@ -10,14 +37,14 @@ Elf64_Off find_main_offset_64(unsigned char *file) {
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (strcmp(section_name, ".symtab") == 0)
+        if (!ft_strcmp(section_name, ".symtab"))
             symtab = &shdr[i];
-        else if (strcmp(section_name, ".strtab") == 0)
+        else if (!ft_strcmp(section_name, ".strtab"))
             strtab = &shdr[i];
     }
 
     if (!symtab || !strtab) {
-        printf("relevant section not found");
+        printf("relevant section not found\n");
         return 0;
     }
 
@@ -28,14 +55,14 @@ Elf64_Off find_main_offset_64(unsigned char *file) {
     Elf64_Addr main_addr = 0;
     for (int i = 0; i < num_symbols; i++) {
         const char *name = strtab_data + symbols[i].st_name;
-        if (strcmp(name, "main") == 0) {
+        if (!ft_strcmp(name, "main")) {
             main_addr = symbols[i].st_value;
             break;
         }
     }
 
     if (!main_addr) {
-        printf("main not found");
+        printf("main not found\n");
         return 0;
     }
 
@@ -65,15 +92,16 @@ Elf64_Addr find_main_addr_64(unsigned char *file) {
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (strcmp(section_name, ".symtab") == 0) {
+        if (!ft_strcmp(section_name, ".symtab")) {
             symtab = &shdr[i];
-        } else if (strcmp(section_name, ".strtab") == 0) {
+        }
+        else if (!ft_strcmp(section_name, ".strtab")) {
             strtab = &shdr[i];
         }
     }
 
     if (!symtab || !strtab) {
-        printf("relevant section not found");
+        printf("relevant section not found\n");
         return 0;
     }
 
@@ -83,12 +111,12 @@ Elf64_Addr find_main_addr_64(unsigned char *file) {
 
     for (int i = 0; i < num_symbols; i++) {
         const char *name = strtab_data + symbols[i].st_name;
-        if (strcmp(name, "main") == 0) {
+        if (!ft_strcmp(name, "main")) {
             return symbols[i].st_value;
         }
     }
 
-    printf("main addr not found");
+    printf("main addr not found\n");
     return 0;
 }
 
@@ -102,15 +130,16 @@ Elf64_Addr find_main_size_64(unsigned char *file) {
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (strcmp(section_name, ".symtab") == 0) {
+        if (!ft_strcmp(section_name, ".symtab")) {
             symtab = &shdr[i];
-        } else if (strcmp(section_name, ".strtab") == 0) {
+        }
+        else if (!ft_strcmp(section_name, ".strtab")) {
             strtab = &shdr[i];
         }
     }
 
     if (!symtab || !strtab) {
-        printf("relevant section not found");
+        printf("relevant section not found\n");
         return 0;
     }
 
@@ -120,16 +149,16 @@ Elf64_Addr find_main_size_64(unsigned char *file) {
 
     for (int i = 0; i < num_symbols; i++) {
         const char *name = strtab_data + symbols[i].st_name;
-        if (strcmp(name, "main") == 0) {
+        if (!ft_strcmp(name, "main")) {
             return symbols[i].st_size;
         }
     }
 
-    printf("main size not found");
+    printf("main size not found\n");
     return 0;
 }
 
-void patch_payload_64(unsigned char *payload, uint64_t main_addr, uint64_t main_size, char *key, uint64_t payload_vaddr) {
+void patch_payload_64(unsigned char *payload, uint64_t main_addr, uint64_t main_size, uint64_t payload_vaddr) {
     uint64_t page_size = 0x1000;
     uint64_t aligned_addr = main_addr & ~(page_size - 1);
     uint64_t offset = main_addr - aligned_addr;
@@ -143,16 +172,17 @@ void patch_payload_64(unsigned char *payload, uint64_t main_addr, uint64_t main_
 
     // size main
     memcpy(&payload[151], &main_size, 8);
+    memcpy(&payload[151], &main_size, 8);
 
     // addr main
-    memcpy(&payload[213], &main_addr, 8);
+    memcpy(&payload[231], &main_addr, 8);
 
-    uint64_t key_addr = payload_vaddr + 260;
+    uint64_t key_addr = payload_vaddr + 278;
     memcpy(&payload[100], &key_addr, 8);
     printf("%lx\n", key_addr);
 }
 
-unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr, char *key) { 
+unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr) { 
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
     Elf64_Phdr *phdr = (Elf64_Phdr *)(file + ehdr->e_phoff);
     Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
@@ -163,7 +193,7 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
     Elf64_Off main_offset = find_main_offset_64(file);
     if (main_addr == 0 || main_size == 0 || main_offset == 0) {
         printf("error addr/size/offset main\n");
-        return 0;
+        return NULL;
     }
     // printf("Start address: 0x%lx\n", start_addr);
     printf("main address: 0x%lx| main size: 0x%lx| main offset 0x%lx\n", main_addr, main_size, main_offset);
@@ -176,7 +206,7 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
 
         // --- write(1, "....WOODY....", 14) ---
         0x48, 0xc7, 0xc7, 0x01, 0x00, 0x00, 0x00,   // mov rdi, 1
-        0x48, 0x8d, 0x35, 0xd5, 0x00, 0x00, 0x00,   // lea rsi, [rip + 213] ; <msg_woody>
+        0x48, 0x8d, 0x35, 0xe7, 0x00, 0x00, 0x00,   // lea rsi, [rip + 231] ; <msg_woody>
         0xba, 0x0e, 0x00, 0x00, 0x00,               // mov edx, 14
         0xb8, 0x01, 0x00, 0x00, 0x00,               // mov eax, 1
         0x0f, 0x05,                                 // syscall
@@ -192,7 +222,7 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
 
         // --- write(1, "Enter key: ", 11) ---
         0x48, 0xc7, 0xc7, 0x01, 0x00, 0x00, 0x00,   // mov rdi, 1
-        0x48, 0x8d, 0x35, 0xa5, 0x00, 0x00, 0x00,   // lea rsi, [rip + 165] ; <msg_enter>
+        0x48, 0x8d, 0x35, 0xb7, 0x00, 0x00, 0x00,   // lea rsi, [rip + 183] ; <msg_enter>
         0xba, 0x0b, 0x00, 0x00, 0x00,               // mov edx, 11
         0xb8, 0x01, 0x00, 0x00, 0x00,               // mov eax, 1
         0x0f, 0x05,                                 // syscall
@@ -201,7 +231,7 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
         // --- read(0, key, key_len)
         0x48, 0x31, 0xff,                                               // xor rdi, rdi
         0x48, 0xbe, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     // mov rsi, <key_addr>
-        0xba, 0x28, 0x00, 0x00, 0x00,                                   // mov edx, 40
+        0xba, 0xf4, 0x01, 0x00, 0x00,                                   // mov edx, 500
         0xb8, 0x00, 0x00, 0x00, 0x00,                                   // mov eax, 0
         0x0f, 0x05,                                                     // syscall
         0x48, 0x89, 0xc7,                                               // mov rdi, rax
@@ -221,7 +251,7 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     // <main_addr>
         0x48, 0xb9,                                         // mov rcx, <main_size>
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     // <main_size> 
-        0x48, 0x8d, 0x1d, 0x5e, 0x00, 0x00, 0x00,           // lea rbx, [rip + 94]
+        0x48, 0x8d, 0x1d, 0x70, 0x00, 0x00, 0x00,           // lea rbx, [rip + 112]
         0x48, 0x31, 0xf6,                                   // xor rsi, rsi        ; i = 0
         0x48, 0x31, 0xd2,                                   // xor rdx, rdx        ; j = 0
         // 33 -- 172
@@ -242,31 +272,34 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
         0x75, 0xe2,                                 // jne xor_loop
         // 13 -- 202
 
-        // --- Setup main(argc, argv) ---
-        0x48, 0x8B, 0x3C, 0x24,                                     // mov rdi, [rsp]
-        0x48, 0x8D, 0x74, 0x24, 0x08,                               // lea rsi, [rsp+8]
-        0x48, 0xB8,                                                 // mov rax, <main_addr>
+        // --- Setup main(argc, argv, envp) ---
+        0x48, 0x8b, 0x3c, 0x24,                                     // mov    rdi, [rsp]      ; argc
+        0x48, 0x8d, 0x74, 0x24, 0x08,                               // lea    rsi, [rsp+8]    ; argv
+        0x48, 0x89, 0xf1,                                           // mov    rcx, rsi        ; rcx = argv
+        0x48, 0x8b, 0x01,                                           // mov    rax, [rcx]      ; rax = argv[i]
+        0x48, 0x83, 0xc1, 0x08,                                     // add    rcx, 8          ; pointer vers argv[i+1]
+        0x48, 0x85, 0xc0,                                           // test   rax, rax
+        0x75, 0xf4,                                                 // jnz    -0x0C (loop)
+        0x48, 0x89, 0xca,                                           // mov    rdx, rcx        ; rdx = envp
+        0x48, 0xb8,                                                 // mov rax, <main_addr>
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // <main_addr>
-        0xFF, 0xD0,                                                 // call rax
-        // 21 -- 223
+        0xff, 0xd0,                                                 // call rax
+        // 39 -- 241
 
         // --- exit(0) ---
         0x48, 0x31, 0xff,                           // xor edi, edi
         0xb8, 0x3c, 0x00, 0x00, 0x00,               // mov eax, 60
         0x0f, 0x05,                                 // syscall
-        // 10 -- 233
+        // 10 -- 251
 
         '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0',
-        // 15 -- 248
+        // 15 -- 266
 
         'E', 'n', 't', 'e', 'r', ' ', 'k', 'e', 'y', ':', ' ', '\0',
-        // 12 -- 260
+        // 12 -- 278
 
         // --- key data ---
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        0x00
     };
 
     const char new_section_name[] = ".test";
@@ -276,7 +309,7 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
 
     // printf("Payload size: %ld %lx\n", payload_size, payload_size);
 
-    // PT_LOAD E
+    // PT_LOAD
     Elf64_Phdr *exec_segment = NULL;
     for (int i = 0; i < ehdr->e_phnum; i++) {
         if ((phdr[i].p_type == PT_LOAD) && (phdr[i].p_flags & PF_X)) {
@@ -289,7 +322,7 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
         return NULL;
     }
 
-    // Trouver la section .shstrtab
+    // find .shstrtab
     Elf64_Shdr *shstrtab = &shdr[ehdr->e_shstrndx];
     const char *old_shstrtab = (const char *)(file + shstrtab->sh_offset);
 
@@ -297,12 +330,12 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
     Elf64_Off injection_offset = exec_segment->p_offset + exec_segment->p_filesz;
     Elf64_Addr injection_vaddr = exec_segment->p_vaddr + exec_segment->p_filesz;
 
-    patch_payload_64(payload_write_woody, main_addr, main_size, key, injection_vaddr);
+    patch_payload_64(payload_write_woody, main_addr, main_size, injection_vaddr);
 
-    // Nouveau offset pour la .shstrtab étendue (après payload)
+    // update offset.shstrtab
     Elf64_Off new_shstrtab_offset = injection_offset + payload_size;
 
-    // Nouvelle taille pour .shstrtab (ancienne taille + nouveau nom)
+    // update taille .shstrtab
     size_t new_shstrtab_size = shstrtab->sh_size + new_section_name_len;
 
     size_t extended_size = file_size + payload_size + sizeof(Elf64_Shdr) + new_section_name_len;
@@ -311,13 +344,13 @@ unsigned char *add_section_64(unsigned char *file, t_elf *elf, unsigned long fil
     if (!new_file)
         return NULL;
 
-    // Copier l'ancien fichier dans le nouveau buffer
+    // copie ancien fichier dans le nouveau buffer
     memcpy(new_file, file, file_size);
 
-    // Copier le payload à l'offset d'injection
+    // copie payload à l'offset d'injection
     memcpy(new_file + injection_offset, payload_write_woody, payload_size);
 
-    // Mettre à jour le segment PT_LOAD exécutable pour inclure la payload
+    // update PT_LOAD pour inclure le payload
     Elf64_Phdr *new_phdr = (Elf64_Phdr *)(new_file + ehdr->e_phoff);
     for (int i = 0; i < ehdr->e_phnum; i++) {
         if ((new_phdr[i].p_type == PT_LOAD) && (new_phdr[i].p_flags & PF_X)) {

@@ -1,5 +1,32 @@
 #include "woody_packer.h"
 
+long space_between_fini_rodata_32(unsigned char *file) {
+    Elf32_Ehdr *eh = (Elf32_Ehdr *)file;
+
+    Elf32_Shdr *sections = (Elf32_Shdr *)(file + eh->e_shoff);
+    Elf32_Shdr *sh_strtab = &sections[eh->e_shstrndx];
+    const char *strtab = (const char *)(file + sh_strtab->sh_offset);
+
+    Elf32_Addr fini_end = 0, rodata_start = 0;
+
+    for (int i = 0; i < eh->e_shnum; i++) {
+        const char *name = strtab + sections[i].sh_name;
+        if (strcmp(name, ".fini") == 0) {
+            fini_end = sections[i].sh_addr + sections[i].sh_size;
+        }
+        else if (strcmp(name, ".rodata") == 0) {
+            rodata_start = sections[i].sh_addr;
+        }
+    }
+
+    if (!fini_end || !rodata_start) {
+        fprintf(stderr, "Sections .fini ou .rodata introuvables\n");
+        return -1;
+    }
+
+    return (long)(rodata_start - fini_end);
+}
+
 Elf32_Off find_main_offset_32(unsigned char *file) {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
     Elf32_Shdr *shdr = (Elf32_Shdr *)(file + ehdr->e_shoff);
@@ -10,14 +37,14 @@ Elf32_Off find_main_offset_32(unsigned char *file) {
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (!strcmp(section_name, ".symtab"))
+        if (!ft_strcmp(section_name, ".symtab"))
             symtab = &shdr[i];
-        else if (!strcmp(section_name, ".strtab"))
+        else if (!ft_strcmp(section_name, ".strtab"))
             strtab = &shdr[i];
     }
 
     if (!symtab || !strtab) {
-        printf("relevant section not found");
+        printf("relevant section not found\n");
         return 0;
     }
 
@@ -28,14 +55,14 @@ Elf32_Off find_main_offset_32(unsigned char *file) {
     Elf32_Addr main_addr = 0;
     for (int i = 0; i < num_symbols; i++) {
         const char *name = strtab_data + symbols[i].st_name;
-        if (!strcmp(name, "main")) {
+        if (!ft_strcmp(name, "main")) {
             main_addr = symbols[i].st_value;
             break;
         }
     }
 
     if (!main_addr) {
-        printf("main not found");
+        printf("main not found\n");
         return 0;
     }
 
@@ -65,15 +92,16 @@ Elf32_Addr find_main_addr_32(unsigned char *file) {
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (!strcmp(section_name, ".symtab")) {
+        if (!ft_strcmp(section_name, ".symtab")) {
             symtab = &shdr[i];
-        } else if (!strcmp(section_name, ".strtab")) {
+        }
+        else if (!ft_strcmp(section_name, ".strtab")) {
             strtab = &shdr[i];
         }
     }
 
     if (!symtab || !strtab) {
-        printf("relevant section not found");
+        printf("relevant section not found\n");
         return 0;
     }
 
@@ -83,12 +111,12 @@ Elf32_Addr find_main_addr_32(unsigned char *file) {
 
     for (int i = 0; i < num_symbols; i++) {
         const char *name = strtab_data + symbols[i].st_name;
-        if (!strcmp(name, "main")) {
+        if (!ft_strcmp(name, "main")) {
             return symbols[i].st_value;
         }
     }
 
-    printf("main addr not found");
+    printf("main addr not found\n");
     return 0;
 }
 
@@ -102,15 +130,15 @@ Elf32_Addr find_main_size_32(unsigned char *file) {
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (!strcmp(section_name, ".symtab")) {
+        if (!ft_strcmp(section_name, ".symtab")) {
             symtab = &shdr[i];
-        } else if (!strcmp(section_name, ".strtab")) {
+        } else if (!ft_strcmp(section_name, ".strtab")) {
             strtab = &shdr[i];
         }
     }
 
     if (!symtab || !strtab) {
-        printf("relevant section not found");
+        printf("relevant section not found\n");
         return 0;
     }
 
@@ -120,7 +148,7 @@ Elf32_Addr find_main_size_32(unsigned char *file) {
 
     for (int i = 0; i < num_symbols; i++) {
         const char *name = strtab_data + symbols[i].st_name;
-        if (!strcmp(name, "main")) {
+        if (!ft_strcmp(name, "main")) {
             return symbols[i].st_size;
         }
     }
@@ -138,9 +166,9 @@ void patch_payload_32(unsigned char *payload, uint32_t main_addr, uint32_t main_
 
     printf("aligned_addr: 0x%x | mprotect_size: 0x%x | keylen: %u\n", aligned_addr, mprotect_size, keylen);
 
-    uint32_t msg_addr_woody = payload_vaddr + 165;
-    uint32_t msg_addr_key = payload_vaddr + 180;
-    uint32_t key_addr = payload_vaddr + 192;
+    uint32_t msg_addr_woody = payload_vaddr + 182;
+    uint32_t msg_addr_key = payload_vaddr + 197;
+    uint32_t key_addr = payload_vaddr + 209;
 
     memcpy(&payload[11], &msg_addr_woody, 4);
 
@@ -156,10 +184,10 @@ void patch_payload_32(unsigned char *payload, uint32_t main_addr, uint32_t main_
 
     memcpy(&payload[112], &key_addr, 4);
 
-    memcpy(&payload[150], &main_addr, 4);
+    memcpy(&payload[167], &main_addr, 4);
 }
 
-unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key) { 
+unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key) { 
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
     Elf32_Phdr *phdr = (Elf32_Phdr *)(file + ehdr->e_phoff);
     Elf32_Shdr *shdr = (Elf32_Shdr *)(file + ehdr->e_shoff);
@@ -170,7 +198,7 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
     Elf32_Off main_offset = find_main_offset_32(file);
     if (main_addr == 0 || main_size == 0 || main_offset == 0) {
         printf("error addr/size/offset main\n");
-        return 0;
+        return NULL;
     }
     // printf("Start address: 0x%lx\n", start_addr);
     printf("main address: 0x%x| main size: 0x%lx| main offset 0x%x\n", main_addr, main_size, main_offset);
@@ -204,7 +232,7 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
         0xb8, 0x03, 0x00, 0x00, 0x00,             // mov eax, 3 (sys_read)
         0xbb, 0x00, 0x00, 0x00, 0x00,             // mov ebx, 0 (stdin)
         0xb9, 0x00, 0x00, 0x00, 0x00,             // mov ecx, <key_addr>
-        0xba, 0x28, 0x00, 0x00, 0x00,             // mov edx, 40
+        0xba, 0xf4, 0x01, 0x00, 0x00,             // mov edx, 500
         0xcd, 0x80,                               // int 0x80
         0x89, 0xc7,                               // mov edi, eax
         // 24 -- 90
@@ -241,31 +269,36 @@ unsigned char *add_section_32(unsigned char *file, t_elf *elf, unsigned long fil
         // 20 -- 140
 
         // --- push args and call main ---
-        0x8b, 0x04, 0x24,                         // mov eax, [esp]
-        0x8d, 0x5c, 0x24, 0x04,                   // lea ebx, [esp+4]
-        0x53,                                     // push ebx
-        0x50,                                     // push eax
-        0xb8, 0x00, 0x00, 0x00, 0x00,             // mov eax, <main_addr>
-        0xff, 0xd0,                               // call eax
-        // 16 -- 156
+        0x8b, 0x04, 0x24,                    // mov    eax, [esp]       ; argc
+        0x8d, 0x5c, 0x24, 0x04,              // lea    ebx, [esp+4]     ; argv
+        0x89, 0xd9,                          // mov    ecx, ebx         ; ecx = argv
+        0x8b, 0x01,                          // mov    eax, [ecx]       ; eax = argv[i]
+        0x83, 0xc1, 0x04,                    // add    ecx, 4           ; argv[i+1]
+        0x85, 0xc0,                          // test   eax, eax
+        0x75, 0xf7,                          // jnz    -9               ; boucle jusqu'à NULL
+        0x89, 0xca,                          // mov    edx, ecx         ; edx = envp
+        0x8b, 0x04, 0x24,                    // mov    eax, [esp]       ; argc
+        0x52,                                // push   edx              ; envp
+        0x53,                                // push   ebx              ; argv
+        0x50,                                // push   eax              ; argc
+        0xb8, 0x00, 0x00, 0x00, 0x00,        // mov    eax, <main_addr>
+        0xff, 0xd0,                          // call   eax
+        // 33 -- 173
 
         // --- exit(0) ---
         0xb8, 0x01, 0x00, 0x00, 0x00,             // mov eax, 1
         0x31, 0xdb,                               // xor ebx, ebx
         0xcd, 0x80,                               // int 0x80
-        // 9 -- 165
+        // 9 -- 182
 
         '.', '.', '.', '.', 'W', 'O', 'O', 'D', 'Y', '.', '.', '.', '.', '\n', '\0',
-        // 15 -- 180
+        // 15 -- 197
 
         'E', 'n', 't', 'e', 'r', ' ', 'k', 'e', 'y', ':', ' ', '\0',
-        // 12 -- 192
+        // 12 -- 209
 
         // --- key data ---
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        0x00
     };
 
     const char new_section_name[] = ".test";

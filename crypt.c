@@ -30,11 +30,6 @@ void crypt_main_32(unsigned char *file, char *key) {
     }
 }
 
-// .text   |   401200 | 1200 | 30154(dec)   75ca(hex)
-// .fini   |   4087cc | 87cc |   13(dec)      d(hex) | 173
-// .rodata |   409000 | 9000 |  635(dec)    27b(hex) | 179
-// main address: 0x406da0| main size: 0x118| main offset 0x6da0
-
 // #include <string.h>
 // #include <stdio.h>
 

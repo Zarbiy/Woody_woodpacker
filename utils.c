@@ -57,25 +57,25 @@ int read_elf_with_header(unsigned char *file) {
             Elf32_Shdr *section = &((Elf32_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8x | %4x | %4u(dec) %6x(hex) | %i\n", i, name_section, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            if (!strcmp(name_section, ".text") || !strcmp(name_section, ".test")) {
-                unsigned char *str_text = file + section->sh_offset;
-                for (int i = 0; i < section->sh_size; i++) {
-                    printf("%02x ", str_text[i]);
-                }
-                printf("\n");
-            }
+            // if (!ft_strcmp(name_section, ".text", 5) || !ft_strcmp(name_section, ".test", 5)) {
+            //     unsigned char *str_text = file + section->sh_offset;
+            //     for (size_t i = 0; i < section->sh_size; i++) {
+            //         printf("%02x ", str_text[i]);
+            //     }
+            //     printf("\n");
+            // }
         }
         else {
             Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
             char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            if (!strcmp(name_section, ".text") || !strcmp(name_section, ".test")) {
-                unsigned char *str_text = file + section->sh_offset;
-                for (int i = 0; i < section->sh_size; i++) {
-                    printf("%02x ", str_text[i]);
-                }
-                printf("\n");
-            }
+            // if (!ft_strcmp(name_section, ".text", 5) || !ft_strcmp(name_section, ".test", 5)) {
+            //     unsigned char *str_text = file + section->sh_offset;
+            //     for (size_t i = 0; i < section->sh_size; i++) {
+            //         printf("%02x ", str_text[i]);
+            //     }
+            //     printf("\n");
+            // }
         }
     }
     return 0;
@@ -94,18 +94,9 @@ int check_duplicate(char *input) {
 }
 
 char *generate_key(size_t len_key, char *char_accepted) {
-    if (len_key < 20 || len_key > 39) {
-        printf("Key too short or to long (20-39). Using default len: 30\n");
-        len_key = 30;
-    }
-
-    if (char_accepted == NULL) {
-        printf("No string given. Using default string\n");
-        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz";
-    }
-    else if (check_duplicate(char_accepted) == -1) {
-        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz";
-        printf("String given contains duplicate. Using default string\n");
+    if (char_accepted == NULL || check_duplicate(char_accepted) == -1) {
+        printf("Error in given string. Using default string\n");
+        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz*-+/-_()#@$&";
     }
 
     size_t len_charset = strlen(char_accepted);
@@ -121,24 +112,51 @@ char *generate_key(size_t len_key, char *char_accepted) {
         return NULL;
     }
 
-    srand((unsigned int)time(NULL));
-    for (size_t i = 0; i < len_key; ++i) {
-        key[i] = char_accepted[rand() % len_charset];
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd < 0) {
+        perror("open /dev/urandom");
+        free(key);
+        return NULL;
     }
+
+    for (size_t i = 0; i < len_key; ++i) {
+        unsigned char rnd;
+        if (read(fd, &rnd, 1) != 1) {
+            perror("read /dev/urandom");
+            close(fd);
+            free(key);
+            return NULL;
+        }
+        key[i] = char_accepted[rnd % len_charset];
+    }
+    close(fd);
+
     key[len_key] = '\0';
     return key;
 }
 
-char *key_to_hex(const char *key) {
-    size_t len = strlen(key);
-    char *hex = malloc(len * 2 + 1);
-    if (!hex) return NULL;
+int calc_size_key(unsigned char *file, int archi) {
+    long space_available = 0;
+    int size_key = 0;
 
-    for (size_t i = 0; i < len; i++) {
-        sprintf(hex + i*2, "%02x", (unsigned char)key[i]);
+    if (archi == 1) {
+        space_available = space_between_fini_rodata_32(file);
+        size_key = find_main_size_32(file);
     }
-    hex[len * 2] = '\0';
-    return hex;
+    else if (archi == 2) {
+        space_available = space_between_fini_rodata_64(file);
+        size_key = find_main_size_64(file);
+    }
+    else {
+        printf("Architecture not found or not valid\n");
+        return 0;
+    }
+
+    if (size_key > space_available)
+        size_key = space_available - 5;
+    if (size_key > 499)
+        size_key = 499;
+    return size_key;
 }
 
 int	ft_atoi(const char *nptr)
@@ -167,4 +185,27 @@ int	ft_atoi(const char *nptr)
 		i++;
 	}
 	return (signe * valeur);
+}
+
+int ft_strcmp(const char *s1, const char *s2) {
+    while (*s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+    }
+    return (unsigned char)(*s1) - (unsigned char)(*s2);
+}
+
+int	ft_strncmp(const char *s1, const char *s2, size_t n)
+{
+	size_t			i;
+	unsigned int	result;
+
+	if (n == 0)
+		return (0);
+	i = 0;
+	while (i < n - 1 && (unsigned char)s1[i] && (unsigned char)s2[i]
+		&& (unsigned char)s1[i] == (unsigned char)s2[i])
+		i++;
+	result = (unsigned char)s1[i] - (unsigned char)s2[i];
+	return (result);
 }
