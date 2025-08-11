@@ -151,6 +151,7 @@ int calc_size_key(unsigned char *file, int archi) {
         printf("Architecture not found or not valid\n");
         return 0;
     }
+    space_available -= 210; // size payload
 
     if (size_key > space_available)
         size_key = space_available - 5;

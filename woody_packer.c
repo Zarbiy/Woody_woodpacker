@@ -32,31 +32,31 @@ int main(int ac, char **av){
     // V2 sans header elf.h
     // printf("\n\nSans header elf\n\n");
 
-    t_index_struct_elf elf;
-    t_index_program_header program;
-    t_index_symtab symtab_struct;
+    // t_index_struct_elf elf;
+    // t_index_program_header program;
+    // t_index_symtab symtab_struct;
 
-    elf.architecture = file[4];
-    if (init_struct_elf_program(&elf, &program, &symtab_struct) < 0) {
-        write(2, "Error init struct elf\n", 22);
-        return 0;
-    }
+    // elf.architecture = file[4];
+    // if (init_struct_elf_program(&elf, &program, &symtab_struct) < 0) {
+    //     write(2, "Error init struct elf\n", 22);
+    //     return 0;
+    // }
     
-    t_elf value_efl;
+    // t_elf value_efl;
 
-    value_efl.size_section = file[elf.size_section[0]] | (file[elf.size_section[1]] << 8);
-    value_efl.number_section = file[elf.number_section[0]] | (file[elf.number_section[1]] << 8);
-    value_efl.index_section_name_section = file[elf.num_section_name_section[0]] | (file[elf.num_section_name_section[1]] << 8);
+    // value_efl.size_section = file[elf.size_section[0]] | (file[elf.size_section[1]] << 8);
+    // value_efl.number_section = file[elf.number_section[0]] | (file[elf.number_section[1]] << 8);
+    // value_efl.index_section_name_section = file[elf.num_section_name_section[0]] | (file[elf.num_section_name_section[1]] << 8);
     // printf("Type : %i\n", elf.architecture);
     // printf("Section taille : %lu\n", value_efl.size_section);
     // printf("Number section : %lu\n", value_efl.number_section);
     // printf("index section name : %lu\n", value_efl.index_section_name_section);
 
-    value_efl.offset_section_table = extract_bytes(file, elf.offset_section_header[0], elf.offset_section_header[1], 0);
+    // value_efl.offset_section_table = extract_bytes(file, elf.offset_section_header[0], elf.offset_section_header[1], 0);
     // printf("offset section table : hex: %lx (dec: %li)\n", value_efl.offset_section_table, value_efl.offset_section_table);
 
-    value_efl.section_name_entry_offset = value_efl.offset_section_table + ((uint64_t)value_efl.index_section_name_section * value_efl.size_section);
-    value_efl.section_name_start = extract_bytes(file, program.offset[0], program.offset[1], value_efl.section_name_entry_offset);
+    // value_efl.section_name_entry_offset = value_efl.offset_section_table + ((uint64_t)value_efl.index_section_name_section * value_efl.size_section);
+    // value_efl.section_name_start = extract_bytes(file, program.offset[0], program.offset[1], value_efl.section_name_entry_offset);
     // char *all_section_name = (char *)(file + value_efl.section_name_start);
 
     // uint64_t text_addr = 0;
@@ -190,6 +190,7 @@ int main(int ac, char **av){
     }
     
     read_elf_with_header(new_file);
+    printf("file size %ld, new file size %ld\n", file_size, new_file_size);
 
     int fd_test = open("woody_test", O_CREAT | O_WRONLY | O_TRUNC, 0777);
     write(fd_test, new_file, new_file_size);
