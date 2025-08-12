@@ -1,170 +1,10 @@
 #include "woody_packer.h"
 
-long space_between_fini_rodata_32(unsigned char *file) {
-    Elf32_Ehdr *eh = (Elf32_Ehdr *)file;
-
-    Elf32_Shdr *sections = (Elf32_Shdr *)(file + eh->e_shoff);
-    Elf32_Shdr *sh_strtab = &sections[eh->e_shstrndx];
-    const char *strtab = (const char *)(file + sh_strtab->sh_offset);
-
-    Elf32_Addr fini_end = 0, rodata_start = 0;
-
-    for (int i = 0; i < eh->e_shnum; i++) {
-        const char *name = strtab + sections[i].sh_name;
-        if (strcmp(name, ".fini") == 0) {
-            fini_end = sections[i].sh_addr + sections[i].sh_size;
-        }
-        else if (strcmp(name, ".rodata") == 0) {
-            rodata_start = sections[i].sh_addr;
-        }
-    }
-
-    if (!fini_end || !rodata_start) {
-        fprintf(stderr, "Sections .fini ou .rodata introuvables\n");
-        return -1;
-    }
-
-    return (long)(rodata_start - fini_end);
-}
-
-Elf32_Off find_main_offset_32(unsigned char *file) {
-    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
-    Elf32_Shdr *shdr = (Elf32_Shdr *)(file + ehdr->e_shoff);
-    const char *sh_strtab = (char *)(file + shdr[ehdr->e_shstrndx].sh_offset);
-
-    Elf32_Shdr *symtab = NULL;
-    Elf32_Shdr *strtab = NULL;
-
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (!ft_strcmp(section_name, ".symtab"))
-            symtab = &shdr[i];
-        else if (!ft_strcmp(section_name, ".strtab"))
-            strtab = &shdr[i];
-    }
-
-    if (!symtab || !strtab) {
-        printf("relevant section not found\n");
-        return 0;
-    }
-
-    Elf32_Sym *symbols = (Elf32_Sym *)(file + symtab->sh_offset);
-    const char *strtab_data = (char *)(file + strtab->sh_offset);
-    int num_symbols = symtab->sh_size / sizeof(Elf32_Sym);
-
-    Elf32_Addr main_addr = 0;
-    for (int i = 0; i < num_symbols; i++) {
-        const char *name = strtab_data + symbols[i].st_name;
-        if (!ft_strcmp(name, "main")) {
-            main_addr = symbols[i].st_value;
-            break;
-        }
-    }
-
-    if (!main_addr) {
-        printf("main not found\n");
-        return 0;
-    }
-
-    Elf32_Phdr *phdr = (Elf32_Phdr *)(file + ehdr->e_phoff);
-    for (int i = 0; i < ehdr->e_phnum; i++) {
-        if (phdr[i].p_type == PT_LOAD) {
-            Elf32_Addr start = phdr[i].p_vaddr;
-            Elf32_Addr end = start + phdr[i].p_memsz;
-
-            if (main_addr >= start && main_addr < end) {
-                Elf32_Off offset = phdr[i].p_offset + (main_addr - start);
-                return offset;
-            }
-        }
-    }
-    return 0;
-}
-
-
-Elf32_Addr find_main_addr_32(unsigned char *file) {
-    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
-    Elf32_Shdr *shdr = (Elf32_Shdr *)(file + ehdr->e_shoff);
-    const char *sh_strtab = (char *)(file + shdr[ehdr->e_shstrndx].sh_offset);
-
-    Elf32_Shdr *symtab = NULL;
-    Elf32_Shdr *strtab = NULL;
-
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (!ft_strcmp(section_name, ".symtab")) {
-            symtab = &shdr[i];
-        }
-        else if (!ft_strcmp(section_name, ".strtab")) {
-            strtab = &shdr[i];
-        }
-    }
-
-    if (!symtab || !strtab) {
-        printf("relevant section not found\n");
-        return 0;
-    }
-
-    Elf32_Sym *symbols = (Elf32_Sym *)(file + symtab->sh_offset);
-    const char *strtab_data = (char *)(file + strtab->sh_offset);
-    int num_symbols = symtab->sh_size / sizeof(Elf32_Sym);
-
-    for (int i = 0; i < num_symbols; i++) {
-        const char *name = strtab_data + symbols[i].st_name;
-        if (!ft_strcmp(name, "main")) {
-            return symbols[i].st_value;
-        }
-    }
-
-    printf("main addr not found\n");
-    return 0;
-}
-
-Elf32_Addr find_main_size_32(unsigned char *file) {
-    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
-    Elf32_Shdr *shdr = (Elf32_Shdr *)(file + ehdr->e_shoff);
-    const char *sh_strtab = (char *)(file + shdr[ehdr->e_shstrndx].sh_offset);
-
-    Elf32_Shdr *symtab = NULL;
-    Elf32_Shdr *strtab = NULL;
-
-    for (int i = 0; i < ehdr->e_shnum; i++) {
-        const char *section_name = sh_strtab + shdr[i].sh_name;
-        if (!ft_strcmp(section_name, ".symtab")) {
-            symtab = &shdr[i];
-        } else if (!ft_strcmp(section_name, ".strtab")) {
-            strtab = &shdr[i];
-        }
-    }
-
-    if (!symtab || !strtab) {
-        printf("relevant section not found\n");
-        return 0;
-    }
-
-    Elf32_Sym *symbols = (Elf32_Sym *)(file + symtab->sh_offset);
-    const char *strtab_data = (char *)(file + strtab->sh_offset);
-    int num_symbols = symtab->sh_size / sizeof(Elf32_Sym);
-
-    for (int i = 0; i < num_symbols; i++) {
-        const char *name = strtab_data + symbols[i].st_name;
-        if (!ft_strcmp(name, "main")) {
-            return symbols[i].st_size;
-        }
-    }
-
-    printf("main size not found");
-    return 0;
-}
-
-void patch_payload_32(unsigned char *payload, uint32_t main_addr, uint32_t main_size, char *key, uint32_t payload_vaddr) {
+void patch_payload_32(unsigned char *payload, uint32_t text_addr, uint32_t text_size, uint32_t payload_vaddr, uint32_t main_addr) {
     uint32_t page_size = 0x1000;
-    uint32_t aligned_addr = main_addr & ~(page_size - 1);
-    uint32_t offset = main_addr - aligned_addr;
-    uint32_t mprotect_size = ((main_size + offset + page_size - 1) & ~(page_size - 1));
-    uint32_t keylen = strlen(key);
-
-    printf("aligned_addr: 0x%x | mprotect_size: 0x%x | keylen: %u\n", aligned_addr, mprotect_size, keylen);
+    uint32_t aligned_addr = text_addr & ~(page_size - 1);
+    uint32_t offset = text_addr - aligned_addr;
+    uint32_t mprotect_size = ((text_size + offset + page_size - 1) & ~(page_size - 1));
 
     uint32_t msg_addr_woody = payload_vaddr + 182;
     uint32_t msg_addr_key = payload_vaddr + 197;
@@ -172,22 +12,24 @@ void patch_payload_32(unsigned char *payload, uint32_t main_addr, uint32_t main_
 
     memcpy(&payload[11], &msg_addr_woody, 4);
 
+    memcpy(&payload[33], &mprotect_size, 4);
+
     memcpy(&payload[28], &aligned_addr, 4);
 
     memcpy(&payload[55], &msg_addr_key, 4);
 
     memcpy(&payload[77], &key_addr, 4);
 
-    memcpy(&payload[102], &main_addr, 4);
+    memcpy(&payload[102], &text_addr, 4);
 
-    memcpy(&payload[107], &main_size, 4);
+    memcpy(&payload[107], &text_size, 4);
 
     memcpy(&payload[112], &key_addr, 4);
 
     memcpy(&payload[167], &main_addr, 4);
 }
 
-unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key) { 
+unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr) { 
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)file;
     Elf32_Phdr *phdr = (Elf32_Phdr *)(file + ehdr->e_phoff);
     Elf32_Shdr *shdr = (Elf32_Shdr *)(file + ehdr->e_shoff);
@@ -201,7 +43,16 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
         return NULL;
     }
     // printf("Start address: 0x%lx\n", start_addr);
-    printf("main address: 0x%x| main size: 0x%lx| main offset 0x%x\n", main_addr, main_size, main_offset);
+    // printf("main address: 0x%x| main size: 0x%lx| main offset 0x%x\n", main_addr, main_size, main_offset);
+
+    Elf32_Addr text_addr = find_text_addr_32(file);
+    Elf32_Xword text_size = find_text_size_32(file);
+    Elf32_Off text_offset = find_text_offset_32(file);
+    if (text_addr == 0 || text_size == 0 || text_offset == 0) {
+        printf("error addr/size/offset .text\n");
+        return NULL;
+    }
+    printf("text address: 0x%x| text size: 0x%lx| text offset 0x%x\n", text_addr, text_size, text_offset);
 
     unsigned char payload_write_woody[] = {
         // --- write(1, "....WOODY....", 14) ---
@@ -304,9 +155,7 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
     const char new_section_name[] = ".test";
 
     size_t payload_size = sizeof(payload_write_woody) - 1;
-    size_t new_section_name_len = strlen(new_section_name) + 1;
-
-    printf("Payload size: %ld %lx\n", payload_size, payload_size);
+    size_t new_section_name_len = ft_strlen(new_section_name) + 1;
 
     // PT_LOAD E
     Elf32_Phdr *exec_segment = NULL;
@@ -321,20 +170,16 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
         return NULL;
     }
     
-    // Trouver la section .shstrtab
     Elf32_Shdr *shstrtab = &shdr[ehdr->e_shstrndx];
     const char *old_shstrtab = (const char *)(file + shstrtab->sh_offset);
     
-    // Calculer le nouvel offset pour injection payload
     Elf32_Off injection_offset = exec_segment->p_offset + exec_segment->p_filesz;
     Elf32_Addr injection_vaddr = exec_segment->p_vaddr + exec_segment->p_filesz;
 
-    patch_payload_32(payload_write_woody, main_addr, main_size, key, injection_vaddr);
+    patch_payload_32(payload_write_woody, text_addr, text_size, injection_vaddr, main_addr);
     
-    // Nouveau offset pour la .shstrtab étendue (après payload)
     Elf32_Off new_shstrtab_offset = injection_offset + payload_size;
     
-    // Nouvelle taille pour .shstrtab (ancienne taille + nouveau nom)
     size_t new_shstrtab_size = shstrtab->sh_size + new_section_name_len;
 
     size_t extended_size = file_size + payload_size + sizeof(Elf32_Shdr) + new_section_name_len;
@@ -343,13 +188,10 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
     if (!new_file)
         return NULL;
 
-    // Copier l'ancien fichier dans le nouveau buffer
     memcpy(new_file, file, file_size);
 
-    // Copier le payload à l'offset d'injection
     memcpy(new_file + injection_offset, payload_write_woody, payload_size);
 
-    // Mettre à jour le segment PT_LOAD exécutable pour inclure la payload
     Elf32_Phdr *new_phdr = (Elf32_Phdr *)(new_file + ehdr->e_phoff);
     for (int i = 0; i < ehdr->e_phnum; i++) {
         if ((new_phdr[i].p_type == PT_LOAD) && (new_phdr[i].p_flags & PF_X)) {
@@ -363,12 +205,10 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
     memcpy(new_shstrtab, old_shstrtab, shstrtab->sh_size);
     strcpy(new_shstrtab + shstrtab->sh_size, new_section_name);
 
-    // updqte header .shstrtab
     Elf32_Shdr *new_shdr = (Elf32_Shdr *)(new_file + ehdr->e_shoff);
     new_shdr[ehdr->e_shstrndx].sh_offset = new_shstrtab_offset;
     new_shdr[ehdr->e_shstrndx].sh_size = new_shstrtab_size;
 
-    // add nouvelle section 
     int shnum = ehdr->e_shnum;
     Elf32_Shdr *new_section = &new_shdr[shnum];
     new_section->sh_name = shstrtab->sh_size;
@@ -379,7 +219,6 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
     new_section->sh_size = payload_size;
     new_section->sh_addralign = 0x10;
 
-    // update header elf
     ehdr = (Elf32_Ehdr *)new_file;
     ehdr->e_shnum += 1;
     ehdr->e_entry = injection_vaddr;

@@ -7,12 +7,12 @@ COLOR_BOLD = \033[1m
 MAKEFLAGS += --no-print-directory
 
 NAME		= woody_woodpacker
-SRC			= woody_packer.c init.c function_32bits.c function_64bits.c utils.c crypt.c
+SRC			= woody_packer.c init.c function_32bits.c function_64bits.c utils.c crypt.c utils_32.c utils_64.c
 OBJ_DIR		= obj
-OBJS		= $(OBJ_DIR)/woody_packer.o $(OBJ_DIR)/init.o $(OBJ_DIR)/function_32bits.o $(OBJ_DIR)/function_64bits.o $(OBJ_DIR)/utils.o $(OBJ_DIR)/crypt.o
+OBJS		= $(OBJ_DIR)/woody_packer.o $(OBJ_DIR)/init.o $(OBJ_DIR)/function_32bits.o $(OBJ_DIR)/function_64bits.o $(OBJ_DIR)/utils.o $(OBJ_DIR)/crypt.o $(OBJ_DIR)/utils_32.o $(OBJ_DIR)/utils_64.o
 
 CC			= cc
-CFLAGS		= -g3 #-Wall -Wextra -Werror
+CFLAGS		= -g3 -Wall -Wextra -Werror
 CHFLAGS		= -I include
 
 RM			= rm -f
@@ -23,7 +23,7 @@ NAME_FILE = bonjour.c
 NAME_EXEC_64 = exec64
 NAME_EXEC_32 = exec32
 
-NAME_PACKER = woody_test
+NAME_PACKER = woody
 
 all: $(NAME)
 

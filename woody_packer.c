@@ -1,9 +1,9 @@
 #include "woody_packer.h"
 
 int main(int ac, char **av){
-    if (ac < 2 || ac > 3) {
+    if (ac < 2 || ac > 4) {
         printf("Wrong number of argument ! Use:\n");
-        printf("./woody_woodpacker exec_name (char_in_key)");
+        printf("./woody_woodpacker exec_name (len_key) (char_in_key)");
         return 0;
     }
 
@@ -27,7 +27,7 @@ int main(int ac, char **av){
     }
 
     // V1 avec header elf.h
-    read_elf_with_header(file);
+    // read_elf_with_header(file);
 
     // V2 sans header elf.h
     // printf("\n\nSans header elf\n\n");
@@ -152,8 +152,22 @@ int main(int ac, char **av){
     if (size_key == 0)
         return 0;
     char *my_key = "";
-    if (ac == 3)
-        my_key = generate_key(size_key, av[2]);
+    if (ac == 3) {
+        size_key = verif_len_key(ft_atoi(av[2]), file);
+        if (size_key <= 0) {
+            printf("Error len key\n");
+            return 0;
+        }
+        my_key = generate_key(size_key, NULL);
+    }
+    else if (ac == 4) {
+        size_key = verif_len_key(ft_atoi(av[2]), file);
+        if (size_key <= 0) {
+            printf("Error len key\n");
+            return 0;
+        }
+        my_key = generate_key(size_key, av[3]);
+    }
     else
         my_key = generate_key(size_key, NULL);
     if (my_key == NULL) 
@@ -166,7 +180,7 @@ int main(int ac, char **av){
         Elf32_Off func_offset = 0;
         Elf32_Xword func_size = 0;
         Elf32_Addr func_vaddr = 0;
-        new_file = add_section_32(file, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr, my_key);
+        new_file = add_section_32(file, file_size, &new_file_size, &func_offset, &func_size, &func_vaddr);
         if (new_file == NULL) {
             free(my_key);
             return 0;
@@ -188,15 +202,14 @@ int main(int ac, char **av){
         printf("Architecture not found or not valid\n");
         return 0;
     }
-    
+
     read_elf_with_header(new_file);
-    printf("file size %ld, new file size %ld\n", file_size, new_file_size);
 
-    int fd_test = open("woody_test", O_CREAT | O_WRONLY | O_TRUNC, 0777);
-    write(fd_test, new_file, new_file_size);
-    close(fd_test);
+    int new_fd = open("woody", O_CREAT | O_WRONLY | O_TRUNC, 0777);
+    write(new_fd, new_file, new_file_size);
+    close(new_fd);
 
-    printf("\n\nKey: %s\n", my_key);
+    printf("Key: %s\n", my_key);
     free(new_file);
     free(my_key);
     return 0;

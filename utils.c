@@ -67,9 +67,9 @@ int read_elf_with_header(unsigned char *file) {
         }
         else {
             Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
-            char *name_section = start_name_section + section->sh_name;
+            // char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            // if (!ft_strcmp(name_section, ".text", 5) || !ft_strcmp(name_section, ".test", 5)) {
+            // if (!ft_strcmp(name_section, ".text") || !ft_strcmp(name_section, ".test") || !ft_strcmp(name_section, ".fini")) {
             //     unsigned char *str_text = file + section->sh_offset;
             //     for (size_t i = 0; i < section->sh_size; i++) {
             //         printf("%02x ", str_text[i]);
@@ -94,15 +94,21 @@ int check_duplicate(char *input) {
 }
 
 char *generate_key(size_t len_key, char *char_accepted) {
-    if (char_accepted == NULL || check_duplicate(char_accepted) == -1) {
+    if (char_accepted == NULL) 
+        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz=*-+/-_(){}[]#@$&:;.,";
+    else if (check_duplicate(char_accepted) == -1) {
         printf("Error in given string. Using default string\n");
-        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz*-+/-_()#@$&";
+        char_accepted = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmopqrstuvwxyz=*-+/-_(){}[]#@$&:;.,";
+    }
+    if (len_key < 20) {
+        printf("Error in len key. Too short !\n");
+        return NULL;
     }
 
-    size_t len_charset = strlen(char_accepted);
+    size_t len_charset = ft_strlen(char_accepted);
 
     if (len_charset < 10) {
-        printf("not enough accepted characters\n");
+        printf("Not enough accepted characters\n");
         return NULL;
     }
 
@@ -141,11 +147,11 @@ int calc_size_key(unsigned char *file, int archi) {
 
     if (archi == 1) {
         space_available = space_between_fini_rodata_32(file);
-        size_key = find_main_size_32(file);
+        size_key = find_text_size_32(file);
     }
     else if (archi == 2) {
         space_available = space_between_fini_rodata_64(file);
-        size_key = find_main_size_64(file);
+        size_key = find_text_size_64(file);
     }
     else {
         printf("Architecture not found or not valid\n");
@@ -158,6 +164,24 @@ int calc_size_key(unsigned char *file, int archi) {
     if (size_key > 499)
         size_key = 499;
     return size_key;
+}
+
+int verif_len_key(int len, unsigned char *file) {
+    int archi = file[4];
+    long space_available = 0;
+    if (archi == 1)
+        space_available = space_between_fini_rodata_32(file);
+    else if (archi == 2)
+        space_available = space_between_fini_rodata_64(file);
+    else {
+        printf("Architecture not found or not valid\n");
+        return 0;
+    }
+    if (len > space_available)
+        len = space_available - 5;
+    if (len > 499)
+        len = 499;
+    return len;
 }
 
 int	ft_atoi(const char *nptr)
@@ -196,8 +220,7 @@ int ft_strcmp(const char *s1, const char *s2) {
     return (unsigned char)(*s1) - (unsigned char)(*s2);
 }
 
-int	ft_strncmp(const char *s1, const char *s2, size_t n)
-{
+int	ft_strncmp(const char *s1, const char *s2, size_t n) {
 	size_t			i;
 	unsigned int	result;
 
@@ -209,4 +232,13 @@ int	ft_strncmp(const char *s1, const char *s2, size_t n)
 		i++;
 	result = (unsigned char)s1[i] - (unsigned char)s2[i];
 	return (result);
+}
+
+size_t	ft_strlen(const char *str) {
+	int	i;
+
+	i = 0;
+	while (str[i])
+		i++;
+	return (i);
 }

@@ -59,31 +59,45 @@ typedef struct s_section {
 // init.c
 int init_struct_elf_program(t_index_struct_elf *elf, t_index_program_header *program, t_index_symtab *symtab);
 
-// utils.c
-uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t add_value);
-int read_elf_with_header(unsigned char *file);
-char *generate_key(size_t len_key, char *char_accepted);
-int calc_size_key(unsigned char *file, int archi);
-int	ft_atoi(const char *nptr);
-int	ft_strncmp(const char *s1, const char *s2, size_t n);
-int ft_strcmp(const char *s1, const char *s2);
-
-// function_32bits.c
-unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr, char *key);
+// utils_32.c
 long space_between_fini_rodata_32(unsigned char *file);
 Elf32_Addr find_main_size_32(unsigned char *file);
 Elf32_Addr find_main_addr_32(unsigned char *file);
 Elf32_Off find_main_offset_32(unsigned char *file);
 
-// function_64bits.c
-unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr);
+Elf32_Addr find_text_size_32(unsigned char *file);
+Elf32_Addr find_text_addr_32(unsigned char *file);
+Elf32_Off find_text_offset_32(unsigned char *file);
+
+// function_32bits.c
+unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr);
+
+// utils_64.c
 long space_between_fini_rodata_64(unsigned char *file);
 Elf64_Addr find_main_size_64(unsigned char *file);
 Elf64_Addr find_main_addr_64(unsigned char *file);
 Elf64_Off find_main_offset_64(unsigned char *file);
 
+Elf64_Addr find_text_size_64(unsigned char *file);
+Elf64_Addr find_text_addr_64(unsigned char *file);
+Elf64_Off find_text_offset_64(unsigned char *file);
+
+// function_64bits.c
+unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr);
+
 // crypt.c
 void crypt_main_64(unsigned char *file, char *key);
 void crypt_main_32(unsigned char *file, char *key);
+
+// utils.c
+uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t add_value);
+int read_elf_with_header(unsigned char *file);
+char *generate_key(size_t len_key, char *char_accepted);
+int calc_size_key(unsigned char *file, int archi);
+int verif_len_key(int len, unsigned char *file);
+int	ft_atoi(const char *nptr);
+int	ft_strncmp(const char *s1, const char *s2, size_t n);
+int ft_strcmp(const char *s1, const char *s2);
+size_t	ft_strlen(const char *str);
 
 #endif

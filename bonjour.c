@@ -2,6 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 
+
+void bob(){
+    printf("Bonjour je suis bob\n");
+    return ;
+}
+
 int main(int ac, char **argv, char **env){
     write(1, "Bonjour je suis bob\n", 20);
     printf("%d\n", ac);
@@ -28,6 +34,6 @@ int main(int ac, char **argv, char **env){
             break;
         b += 1;
     }
-
+    bob();
     return 0;
 }
