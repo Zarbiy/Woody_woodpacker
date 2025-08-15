@@ -69,7 +69,7 @@ int read_elf_with_header(unsigned char *file) {
             Elf64_Shdr *section = &((Elf64_Shdr *)section_table)[i];
             // char *name_section = start_name_section + section->sh_name;
             printf("%2d | %20s | %8lx | %4lx | %4lu(dec) %6lx(hex) | %i\n", i, start_name_section + section->sh_name, section->sh_addr, section->sh_offset, section->sh_size, section->sh_size, section->sh_name);
-            // if (!ft_strcmp(name_section, ".text") || !ft_strcmp(name_section, ".test") || !ft_strcmp(name_section, ".fini")) {
+            // if (!ft_strcmp(name_section, ".text")) {
             //     unsigned char *str_text = file + section->sh_offset;
             //     for (size_t i = 0; i < section->sh_size; i++) {
             //         printf("%02x ", str_text[i]);
@@ -234,11 +234,29 @@ int	ft_strncmp(const char *s1, const char *s2, size_t n) {
 	return (result);
 }
 
-size_t	ft_strlen(const char *str) {
+size_t ft_strlen(const char *str) {
 	int	i;
 
 	i = 0;
 	while (str[i])
 		i++;
 	return (i);
+}
+
+void *ft_memcpy(void *dest, const void *src, size_t n) {
+	char	*d;
+	char	*s;
+	size_t	i;
+
+	if (!dest && !src)
+		return (0);
+	i = 0;
+	d = (char *)dest;
+	s = (char *)src;
+	while (i < n)
+	{
+		d[i] = s[i];
+		i++;
+	}
+	return (dest);
 }

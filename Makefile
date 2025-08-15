@@ -27,11 +27,11 @@ NAME_PACKER = woody
 
 all: $(NAME)
 
-$(NAME): $(OBJS) woody_packer.h
+$(NAME): $(OBJS)
 	@$(CC) $(OBJS) -o $(NAME)
 	@printf "$(COLOR_RED)$(COLOR_BOLD)Compilation réussie !$(COLOR_RESET)\n"
 
-$(OBJ_DIR)/%.o: %.c
+$(OBJ_DIR)/%.o: %.c woody_packer.h
 	@$(DIR_DUP)
 	@$(CC) $(CFLAGS) $(CHFLAGS) -c -o $@ $<
 

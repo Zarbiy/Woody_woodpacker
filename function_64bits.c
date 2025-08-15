@@ -7,19 +7,19 @@ void patch_payload_64(unsigned char *payload, uint64_t text_addr, uint64_t text_
     uint64_t mprotect_size = ((text_size + offset + page_size - 1) & ~(page_size - 1));
 
     // mprotect
-    memcpy(&payload[44], &mprotect_size, 8);
+    ft_memcpy(&payload[44], &mprotect_size, 8);
     
     // addr text
-    memcpy(&payload[141], &text_addr, 8);
+    ft_memcpy(&payload[141], &text_addr, 8);
 
     // size text
-    memcpy(&payload[151], &text_size, 8);
+    ft_memcpy(&payload[151], &text_size, 8);
 
     // addr main
-    memcpy(&payload[231], &main_addr, 8);
+    ft_memcpy(&payload[231], &main_addr, 8);
 
     uint64_t key_addr = payload_vaddr + 278;
-    memcpy(&payload[100], &key_addr, 8);
+    ft_memcpy(&payload[100], &key_addr, 8);
 }
 
 unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf64_Off *func_offset, Elf64_Xword *func_size, Elf64_Addr *func_vaddr) { 
@@ -28,13 +28,10 @@ unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsi
     Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
    
     Elf64_Addr main_addr = find_main_addr_64(file);
-    Elf64_Xword main_size = find_main_size_64(file);
-    Elf64_Off main_offset = find_main_offset_64(file);
-    if (main_addr == 0 || main_size == 0 || main_offset == 0) {
-        printf("error addr/size/offset main\n");
+    if (main_addr == 0) {
+        printf("error addr main\n");
         return NULL;
     }
-    // printf("main address: 0x%lx| main size: 0x%lx| main offset 0x%lx\n", main_addr, main_size, main_offset);
 
     Elf64_Addr text_addr = find_text_addr_64(file);
     Elf64_Xword text_size = find_text_size_64(file);
@@ -190,10 +187,10 @@ unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsi
         return NULL;
 
     // copie ancien fichier dans le nouveau buffer
-    memcpy(new_file, file, file_size);
+    ft_memcpy(new_file, file, file_size);
 
     // copie payload à l'offset d'injection
-    memcpy(new_file + injection_offset, payload_write_woody, payload_size);
+    ft_memcpy(new_file + injection_offset, payload_write_woody, payload_size);
 
     // update PT_LOAD pour inclure le payload
     Elf64_Phdr *new_phdr = (Elf64_Phdr *)(new_file + ehdr->e_phoff);
@@ -206,7 +203,7 @@ unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsi
     }
 
     char *new_shstrtab = (char *)(new_file + new_shstrtab_offset);
-    memcpy(new_shstrtab, old_shstrtab, shstrtab->sh_size);
+    ft_memcpy(new_shstrtab, old_shstrtab, shstrtab->sh_size);
     strcpy(new_shstrtab + shstrtab->sh_size, new_section_name);
 
     // updqte header .shstrtab

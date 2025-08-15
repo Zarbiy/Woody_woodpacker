@@ -10,23 +10,23 @@ void patch_payload_32(unsigned char *payload, uint32_t text_addr, uint32_t text_
     uint32_t msg_addr_key = payload_vaddr + 197;
     uint32_t key_addr = payload_vaddr + 209;
 
-    memcpy(&payload[11], &msg_addr_woody, 4);
+    ft_memcpy(&payload[11], &msg_addr_woody, 4);
 
-    memcpy(&payload[33], &mprotect_size, 4);
+    ft_memcpy(&payload[33], &mprotect_size, 4);
 
-    memcpy(&payload[28], &aligned_addr, 4);
+    ft_memcpy(&payload[28], &aligned_addr, 4);
 
-    memcpy(&payload[55], &msg_addr_key, 4);
+    ft_memcpy(&payload[55], &msg_addr_key, 4);
 
-    memcpy(&payload[77], &key_addr, 4);
+    ft_memcpy(&payload[77], &key_addr, 4);
 
-    memcpy(&payload[102], &text_addr, 4);
+    ft_memcpy(&payload[102], &text_addr, 4);
 
-    memcpy(&payload[107], &text_size, 4);
+    ft_memcpy(&payload[107], &text_size, 4);
 
-    memcpy(&payload[112], &key_addr, 4);
+    ft_memcpy(&payload[112], &key_addr, 4);
 
-    memcpy(&payload[167], &main_addr, 4);
+    ft_memcpy(&payload[167], &main_addr, 4);
 }
 
 unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsigned long *new_file_size, Elf32_Off *func_offset, Elf32_Xword *func_size, Elf32_Addr *func_vaddr) { 
@@ -36,10 +36,8 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
    
     // Elf32_Addr start_addr = ehdr->e_entry;
     Elf32_Addr main_addr = find_main_addr_32(file);
-    Elf32_Xword main_size = find_main_size_32(file);
-    Elf32_Off main_offset = find_main_offset_32(file);
-    if (main_addr == 0 || main_size == 0 || main_offset == 0) {
-        printf("error addr/size/offset main\n");
+    if (main_addr == 0) {
+        printf("error addr main\n");
         return NULL;
     }
     // printf("Start address: 0x%lx\n", start_addr);
@@ -188,9 +186,9 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
     if (!new_file)
         return NULL;
 
-    memcpy(new_file, file, file_size);
+    ft_memcpy(new_file, file, file_size);
 
-    memcpy(new_file + injection_offset, payload_write_woody, payload_size);
+    ft_memcpy(new_file + injection_offset, payload_write_woody, payload_size);
 
     Elf32_Phdr *new_phdr = (Elf32_Phdr *)(new_file + ehdr->e_phoff);
     for (int i = 0; i < ehdr->e_phnum; i++) {
@@ -202,7 +200,7 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
     }
 
     char *new_shstrtab = (char *)(new_file + new_shstrtab_offset);
-    memcpy(new_shstrtab, old_shstrtab, shstrtab->sh_size);
+    ft_memcpy(new_shstrtab, old_shstrtab, shstrtab->sh_size);
     strcpy(new_shstrtab + shstrtab->sh_size, new_section_name);
 
     Elf32_Shdr *new_shdr = (Elf32_Shdr *)(new_file + ehdr->e_shoff);

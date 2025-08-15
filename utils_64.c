@@ -127,7 +127,6 @@ Elf64_Off find_main_offset_64(unsigned char *file) {
     return 0;
 }
 
-
 Elf64_Addr find_main_addr_64(unsigned char *file) {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)file;
     Elf64_Shdr *shdr = (Elf64_Shdr *)(file + ehdr->e_shoff);
@@ -136,6 +135,7 @@ Elf64_Addr find_main_addr_64(unsigned char *file) {
     Elf64_Shdr *symtab = NULL;
     Elf64_Shdr *strtab = NULL;
 
+    // Recherche symtab et strtab
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *section_name = sh_strtab + shdr[i].sh_name;
         if (!ft_strcmp(section_name, ".symtab"))
@@ -144,22 +144,23 @@ Elf64_Addr find_main_addr_64(unsigned char *file) {
             strtab = &shdr[i];
     }
 
-    if (!symtab || !strtab) {
-        printf("relevant section not found\n");
-        return 0;
+    // exec non strip
+    if (symtab && strtab) {
+        Elf64_Sym *symbols = (Elf64_Sym *)(file + symtab->sh_offset);
+        const char *strtab_data = (char *)(file + strtab->sh_offset);
+        int num_symbols = symtab->sh_size / sizeof(Elf64_Sym);
+
+        for (int i = 0; i < num_symbols; i++) {
+            const char *name = strtab_data + symbols[i].st_name;
+            if (!ft_strcmp(name, "main"))
+                return symbols[i].st_value;
+        }
     }
 
-    Elf64_Sym *symbols = (Elf64_Sym *)(file + symtab->sh_offset);
-    const char *strtab_data = (char *)(file + strtab->sh_offset);
-    int num_symbols = symtab->sh_size / sizeof(Elf64_Sym);
-
-    for (int i = 0; i < num_symbols; i++) {
-        const char *name = strtab_data + symbols[i].st_name;
-        if (!ft_strcmp(name, "main"))
-            return symbols[i].st_value;
-    }
-
-    printf("main addr not found\n");
+    printf("Exec stripped !\n");
+    if (ehdr->e_type == ET_DYN)
+        printf("PIE is active !\n");
+    
     return 0;
 }
 
