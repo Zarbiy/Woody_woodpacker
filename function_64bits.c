@@ -96,21 +96,21 @@ unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsi
         0x48, 0xb9,                                         // mov rcx, <text_size>
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     // <text_size> 
         0x48, 0x8d, 0x1d, 0x70, 0x00, 0x00, 0x00,           // lea rbx, [rip + 112]
-        0x48, 0x31, 0xf6,                                   // xor rsi, rsi        ; i = 0
-        0x48, 0x31, 0xd2,                                   // xor rdx, rdx        ; j = 0
+        0x48, 0x31, 0xf6,                                   // xor rsi, rsi
+        0x48, 0x31, 0xd2,                                   // xor rdx, rdx
         // 33 -- 172
 
         // xor_loop:
         0x4d, 0x31, 0xc9,                           // xor r9, r9
         0x44, 0x8a, 0x0c, 0x13,                     // mov r9b, [rbx + rdx]
         0x45, 0x30, 0x0c, 0x33,                     // xor [r11 + rsi], r9b
-        0x48, 0xff, 0xc6,                           // inc rsi             ; ++i
-        0x48, 0xff, 0xc2,                           // inc rdx             ; ++j
+        0x48, 0xff, 0xc6,                           // inc rsi
+        0x48, 0xff, 0xc2,                           // inc rdx
         // 17 -- 189
 
         0x48, 0x39, 0xfa,                           // cmp rdx, rdi        ; j < key_len ?
         0x72, 0x03,                                 // jb skip_reset
-        0x48, 0x31, 0xd2,                           // xor rdx, rdx        ; j = 0
+        0x48, 0x31, 0xd2,                           // xor rdx, rdx
         // skip_reset:
         0x48, 0xff, 0xc9,                           // dec rcx
         0x75, 0xe2,                                 // jne xor_loop
@@ -123,7 +123,7 @@ unsigned char *add_section_64(unsigned char *file, unsigned long file_size, unsi
         0x48, 0x8b, 0x01,                                           // mov    rax, [rcx]      ; rax = argv[i]
         0x48, 0x83, 0xc1, 0x08,                                     // add    rcx, 8          ; pointer vers argv[i+1]
         0x48, 0x85, 0xc0,                                           // test   rax, rax
-        0x75, 0xf4,                                                 // jnz    -0x0C (loop)
+        0x75, 0xf4,                                                 // jnz    -0x0C
         0x48, 0x89, 0xca,                                           // mov    rdx, rcx        ; rdx = envp
         0x48, 0xb8,                                                 // mov rax, <main_addr>
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // <main_addr>

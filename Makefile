@@ -7,9 +7,9 @@ COLOR_BOLD = \033[1m
 MAKEFLAGS += --no-print-directory
 
 NAME		= woody_woodpacker
-SRC			= woody_packer.c init.c function_32bits.c function_64bits.c utils.c crypt.c utils_32.c utils_64.c
+SRC			= woody_packer.c function_32bits.c function_64bits.c utils.c crypt.c utils_32.c utils_64.c
 OBJ_DIR		= obj
-OBJS		= $(OBJ_DIR)/woody_packer.o $(OBJ_DIR)/init.o $(OBJ_DIR)/function_32bits.o $(OBJ_DIR)/function_64bits.o $(OBJ_DIR)/utils.o $(OBJ_DIR)/crypt.o $(OBJ_DIR)/utils_32.o $(OBJ_DIR)/utils_64.o
+OBJS		= $(OBJ_DIR)/woody_packer.o $(OBJ_DIR)/function_32bits.o $(OBJ_DIR)/function_64bits.o $(OBJ_DIR)/utils.o $(OBJ_DIR)/crypt.o $(OBJ_DIR)/utils_32.o $(OBJ_DIR)/utils_64.o
 
 CC			= cc
 CFLAGS		= -g3 -Wall -Wextra -Werror

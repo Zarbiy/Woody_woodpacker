@@ -100,18 +100,18 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
         0xb9, 0x00, 0x00, 0x00, 0x00,             // mov ecx, <main_size>
         0xba, 0x00, 0x00, 0x00, 0x00,             // mov edx, <key_addr>
         0x31, 0xed,                               // xor ebp, ebp
-        0x31, 0xdb,                               // xor ebx, ebx              ; i = 0
+        0x31, 0xdb,                               // xor ebx, ebx
         // 19 -- 120
 
         // loop:
         0x31, 0xc0,                               // xor eax, eax
         0x8a, 0x04, 0x1a,                         // mov al, [edx + ebx]
         0x30, 0x04, 0x2e,                         // xor [esi + ebp], al
-        0x45,                                     // inc ebp                   ; i++
-        0x43,                                     // inc ebx                   ; j++
+        0x45,                                     // inc ebp
+        0x43,                                     // inc ebx
         0x39, 0xdf,                               // cmp ebx, edi              ; j < key_len ?
         0x75, 0x02,                               // jne skip_reset
-        0x31, 0xdb,                               // xor ebx, ebx              ; j = 0
+        0x31, 0xdb,                               // xor ebx, ebx
         // skip_reset:
         0x39, 0xcd,                               // cmp ebp, ecx              ; i < main_size ?
         0x7c, 0xec,                               // jl loop
@@ -124,7 +124,7 @@ unsigned char *add_section_32(unsigned char *file, unsigned long file_size, unsi
         0x8b, 0x01,                          // mov    eax, [ecx]       ; eax = argv[i]
         0x83, 0xc1, 0x04,                    // add    ecx, 4           ; argv[i+1]
         0x85, 0xc0,                          // test   eax, eax
-        0x75, 0xf7,                          // jnz    -9               ; boucle jusqu'à NULL
+        0x75, 0xf7,                          // jnz    -9
         0x89, 0xca,                          // mov    edx, ecx         ; edx = envp
         0x8b, 0x04, 0x24,                    // mov    eax, [esp]       ; argc
         0x52,                                // push   edx              ; envp

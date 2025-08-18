@@ -56,9 +56,6 @@ typedef struct s_section {
     uint64_t        sh_size;
 } t_section;
 
-// init.c
-int init_struct_elf_program(t_index_struct_elf *elf, t_index_program_header *program, t_index_symtab *symtab);
-
 // utils_32.c
 long space_between_fini_rodata_32(unsigned char *file);
 Elf32_Addr find_main_size_32(unsigned char *file);
@@ -91,7 +88,7 @@ void crypt_main_32(unsigned char *file, char *key);
 
 // utils.c
 uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t add_value);
-int read_elf_with_header(unsigned char *file);
+int read_elf(unsigned char *file);
 char *generate_key(size_t len_key, char *char_accepted);
 int calc_size_key(unsigned char *file, int archi);
 int verif_len_key(int len, unsigned char *file);

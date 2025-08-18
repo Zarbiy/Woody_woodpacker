@@ -83,7 +83,7 @@ int main(int ac, char **av){
         return 0;
     }
 
-    read_elf_with_header(new_file);
+    read_elf(new_file);
 
     int new_fd = open("woody", O_CREAT | O_WRONLY | O_TRUNC, 0777);
     write(new_fd, new_file, new_file_size);

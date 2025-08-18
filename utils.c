@@ -8,7 +8,7 @@ uint64_t extract_bytes(unsigned char *file, uint8_t start, uint8_t end, uint64_t
     return result;
 }
 
-int read_elf_with_header(unsigned char *file) {
+int read_elf(unsigned char *file) {
     // printf("Avec header elf\n\n");
     Elf32_Ehdr *header32 = NULL;
     Elf64_Ehdr *header64 = NULL;
