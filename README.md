@@ -1,10 +1,10 @@
-# 🪵 Woody Woodpacker - 42 Project
+# Woody Woodpacker - 42 Project
 
 Projet de l’école **42** : écrire un packer en C qui chiffre un exécutable ELF64, et ajoute un *loader* pour le déchiffrer et exécuter le programme original.  
 
 ---
 
-## 📖 Description
+## Description
 
 L’objectif du projet est de :
 - Recompiler un binaire ELF64 en l’encapsulant avec un *packer*  
@@ -16,7 +16,8 @@ C’est une introduction à la **reverse engineering**, la **cryptographie simpl
 
 ---
 
-## 🛠️ Compilation
+## Compilation
 
 ```bash
 make
+./woody_woodpacker exec
